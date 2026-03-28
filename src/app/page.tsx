@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import confetti from "canvas-confetti";
 import ImageUpload from "@/components/ImageUpload";
 import ResultsDisplay from "@/components/ResultsDisplay";
-import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCamera, DoodleLamp, DoodleHeart, DoodleFrame } from "@/components/DoodleElements";
+import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCamera, DoodleLamp, DoodleHeart, DoodleFrame, FloatingDoodles } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
 import type { StylingResult, ProductMatch, ProductSearchResult } from "@/lib/schema";
 
@@ -276,57 +276,60 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative">
-      {/* ── Sticky Frosted Header ── */}
-      <header className="sticky top-0 z-50 border-b border-accent-100 bg-bg-card/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-2xl px-4 py-3.5 flex items-center gap-3">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl shadow-sm"
-            style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
-          >
-            <svg className="w-5 h-5 text-txt-on-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1m-2 0h2" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold text-txt-primary tracking-tight">
-              Budget Cozy Bedroom Stylist
-            </h1>
-            <p className="text-xs text-txt-muted">
-              AI-powered room makeovers on a real budget
-            </p>
-          </div>
-        </div>
-      </header>
-
       {/* ── Main Content ── */}
       <main className={`relative z-10 mx-auto px-4 py-8 sm:py-12 space-y-8 ${appState === "results" ? "max-w-5xl" : "max-w-2xl"}`}>
         {/* Upload / Idle State */}
         {appState !== "results" && (
-          <div className="animate-fadeIn">
-            {/* Hero section with doodle bear — only when no file selected */}
+          <div className="animate-fadeIn space-y-6">
+            {/* Hero + landing content — only when no file selected */}
             {!file && appState !== "loading" && (
-              <div className="text-center py-4 space-y-4">
-                <div className="flex items-end justify-center gap-3 mb-2">
-                  <DoodleStar className="w-6 h-6 animate-twinkle self-start mt-2" />
-                  <DoodleBear className="w-28 h-28 sm:w-32 sm:h-32 animate-wiggle" />
-                  <DoodleStar className="w-5 h-5 animate-twinkle self-start mt-4" />
+              <div className="text-center space-y-6 relative">
+                {/* Floating background doodles */}
+                <FloatingDoodles />
+
+                {/* Hero Brand */}
+                <div className="relative z-10 space-y-4">
+                  <div className="flex items-end justify-center gap-3 mb-2">
+                    <DoodleStar className="w-7 h-7 animate-twinkle self-start mt-2" />
+                    <DoodleBear className="w-32 h-32 sm:w-40 sm:h-40 animate-wiggle" />
+                    <DoodleHeart className="w-6 h-6 animate-heartBeat self-start mt-4" />
+                  </div>
+
+                  <h2 className="text-4xl sm:text-5xl font-bold text-txt-primary tracking-tight leading-tight">
+                    <span
+                      className="bg-clip-text text-transparent"
+                      style={{ backgroundImage: 'linear-gradient(to right, #E8753A, #D4877A, #B84E20)' }}
+                    >
+                      Roomify
+                    </span>
+                  </h2>
+                  <p className="text-base sm:text-lg text-txt-secondary max-w-md mx-auto leading-relaxed">
+                    Your dream bedroom, styled by AI,<br />on a real budget.
+                  </p>
                 </div>
 
-                <h2 className="text-3xl sm:text-4xl font-bold text-txt-primary tracking-tight leading-tight">
-                  Your dream bedroom,<br />
-                  <span
-                    className="bg-clip-text text-transparent"
-                    style={{ backgroundImage: 'linear-gradient(to right, #E8753A, #D4877A)' }}
-                  >
-                    on a real budget
-                  </span>
-                </h2>
-                <p className="text-txt-secondary text-base max-w-md mx-auto leading-relaxed">
-                  Snap a photo of your room and get AI-powered makeover ideas — like your favorite TikTok room transformations.
-                </p>
-                <p className="text-accent-400 text-sm font-medium">
-                  Let&apos;s make your room cozy!
-                </p>
+                {/* How It Works */}
+                <div className="relative z-10 max-w-xs mx-auto">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-3">
+                    How it works
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { icon: <DoodleCamera className="w-6 h-6" />, label: "Upload a photo", step: "1" },
+                      { icon: <DoodleStar className="w-6 h-6" />, label: "AI styles it", step: "2" },
+                      { icon: <DoodleHeart className="w-6 h-6" />, label: "Shop the look", step: "3" },
+                    ].map(({ icon, label, step }) => (
+                      <div key={step} className="flex flex-col items-center gap-1.5">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-50 border border-accent-100">
+                          {icon}
+                        </div>
+                        <span className="text-[11px] font-medium text-txt-secondary leading-tight">
+                          {label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 

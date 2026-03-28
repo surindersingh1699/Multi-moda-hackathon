@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Budget Cozy Bedroom Stylist",
-  description: "Transform your bedroom with affordable, curated styling suggestions",
+  title: "Roomify",
+  description: "AI-powered room makeovers on a real budget",
 };
 
 export default function RootLayout({

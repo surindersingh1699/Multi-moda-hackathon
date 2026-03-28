@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
+import { Ratelimit } from "@unkey/ratelimit";
 import { buildPromptWithPreferences } from "@/lib/prompt";
 import { RESPONSE_FORMAT } from "@/lib/schema";
 import { validateResult } from "@/lib/validate";
@@ -7,8 +9,33 @@ import { MOCK_RESULT } from "@/lib/mock";
 
 const MAX_PAYLOAD_BYTES = 6 * 1024 * 1024; // 6MB (covers ~4MB image as base64)
 
+// Unkey rate limiter: 10 requests per 60s per IP
+const limiter = process.env.UNKEY_ROOT_KEY
+  ? new Ratelimit({
+      rootKey: process.env.UNKEY_ROOT_KEY,
+      namespace: "roomify-analyze",
+      limit: 10,
+      duration: "60s",
+    })
+  : null;
+
 export async function POST(req: NextRequest) {
   try {
+    // Rate limiting via Unkey
+    if (limiter) {
+      const identifier =
+        req.headers.get("x-forwarded-for") ??
+        req.headers.get("x-real-ip") ??
+        "anonymous";
+      const { success } = await limiter.limit(identifier);
+      if (!success) {
+        return NextResponse.json(
+          { error: "Too many requests. Please try again in a minute." },
+          { status: 429 }
+        );
+      }
+    }
+
     const contentLength = req.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_BYTES) {
       return NextResponse.json(
@@ -37,28 +64,41 @@ export async function POST(req: NextRequest) {
       typeof budget === "number" && budget > 0 ? budget : 150;
 
     // Mock mode when no API key is set
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY && !process.env.GOOGLE_API_KEY) {
       await new Promise((r) => setTimeout(r, 1500));
       return NextResponse.json(MOCK_RESULT);
     }
 
-    const openai = new OpenAI();
     const systemPrompt = buildPromptWithPreferences(userPrompt, budgetNum);
 
-    const result = await callModel(openai, image, systemPrompt);
+    // Primary: OpenAI GPT-4o — Fallback: Google Gemini
+    let result: unknown;
+    try {
+      if (!process.env.OPENAI_API_KEY) throw new Error("No OpenAI key");
+      const openai = new OpenAI();
+      result = await callOpenAI(openai, image, systemPrompt);
+    } catch (openaiError) {
+      console.warn("OpenAI failed, falling back to Gemini:", openaiError);
+      if (!process.env.GOOGLE_API_KEY) throw openaiError;
+      result = await callGemini(image, systemPrompt);
+    }
 
     const validation = validateResult(result, budgetNum);
     if (validation.ok) {
       return NextResponse.json(validation.data);
     }
 
-    // Retry once with error feedback
-    const retryResult = await callModel(
-      openai,
-      image,
-      systemPrompt,
-      `Your previous response failed validation: ${validation.error}. Please fix and return valid JSON with exactly 4-6 items and total cost under $${budgetNum}.`
-    );
+    // Retry once — try OpenAI first, then Gemini fallback
+    const retryHint = `Your previous response failed validation: ${validation.error}. Please fix and return valid JSON with exactly 4-6 items and total cost under $${budgetNum}.`;
+    let retryResult: unknown;
+    try {
+      if (!process.env.OPENAI_API_KEY) throw new Error("No OpenAI key");
+      const openai = new OpenAI();
+      retryResult = await callOpenAI(openai, image, systemPrompt, retryHint);
+    } catch {
+      if (!process.env.GOOGLE_API_KEY) throw new Error("Both providers failed");
+      retryResult = await callGemini(image, systemPrompt + "\n\n" + retryHint);
+    }
 
     const retryValidation = validateResult(retryResult, budgetNum);
     if (retryValidation.ok) {
@@ -77,7 +117,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function callModel(
+/** Primary: OpenAI GPT-4o with structured output */
+async function callOpenAI(
   openai: OpenAI,
   imageDataUrl: string,
   systemPrompt: string,
@@ -110,6 +151,42 @@ async function callModel(
   const content = response.choices[0]?.message?.content;
   if (!content) {
     throw new Error("Empty response from model");
+  }
+
+  return JSON.parse(content);
+}
+
+/** Fallback: Google Gemini with vision */
+async function callGemini(
+  imageDataUrl: string,
+  systemPrompt: string
+): Promise<unknown> {
+  const genai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! });
+
+  // Strip the data URL prefix to get raw base64 + mime type
+  const match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+  const mimeType = match?.[1] ?? "image/jpeg";
+  const base64Data = match?.[2] ?? imageDataUrl;
+
+  const response = await genai.models.generateContent({
+    model: "gemini-2.5-flash-preview-05-20",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: systemPrompt + "\n\nAnalyze this room image and return ONLY valid JSON matching the schema above." },
+          { inlineData: { mimeType, data: base64Data } },
+        ],
+      },
+    ],
+    config: {
+      responseMimeType: "application/json",
+    },
+  });
+
+  const content = response.text;
+  if (!content) {
+    throw new Error("Empty response from Gemini");
   }
 
   return JSON.parse(content);
