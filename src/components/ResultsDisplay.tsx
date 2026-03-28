@@ -3,9 +3,10 @@ import { DoodlePillow, DoodleLamp, DoodlePlant, DoodleHeart } from "@/components
 
 interface Props {
   result: StylingResult;
+  budget?: number;
 }
 
-export default function ResultsDisplay({ result }: Props) {
+export default function ResultsDisplay({ result, budget = 150 }: Props) {
   const items = result.items ?? [];
   const totalCost =
     typeof result.total_estimated_cost === "number" && isFinite(result.total_estimated_cost)
@@ -15,7 +16,7 @@ export default function ResultsDisplay({ result }: Props) {
     ? result.buy_order.filter((s): s is string => typeof s === "string")
     : items.map((i) => i.name);
 
-  const budgetPercent = Math.min(100, Math.round((totalCost / 150) * 100));
+  const budgetPercent = Math.min(100, Math.round((totalCost / budget) * 100));
 
   const barColor =
     budgetPercent < 60 ? '#7EA86A' : budgetPercent < 85 ? '#E8753A' : '#DC2626';
@@ -65,7 +66,7 @@ export default function ResultsDisplay({ result }: Props) {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
           <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
           <DoodlePlant className="w-4 h-4 inline-block" />
-          Recommended Items
+          What to Buy
           <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
         </h2>
         <div className="grid gap-3">
@@ -117,7 +118,7 @@ export default function ResultsDisplay({ result }: Props) {
           <span className="text-3xl font-bold text-txt-primary">
             ${totalCost}
           </span>
-          <span className="text-sm text-txt-muted pb-1">/ $150 budget</span>
+          <span className="text-sm text-txt-muted pb-1">/ ${budget} budget</span>
         </div>
         <div className="h-3 w-full rounded-full bg-bg-secondary overflow-hidden">
           <div
@@ -140,8 +141,9 @@ export default function ResultsDisplay({ result }: Props) {
 function ItemCard({ item, index }: { item: StylingItem; index: number }) {
   const name = item.name || "Unnamed item";
   const price = typeof item.estimated_price === "number" ? item.estimated_price : 0;
-  const category = item.category ? item.category.replace("_", " ") : "item";
+  const category = item.category || "item";
   const store = item.suggested_store || "Store";
+  const searchQuery = item.search_query || name;
 
   return (
     <div
@@ -177,7 +179,7 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
           <Tag label={category} />
           <Tag label={store} />
           <a
-            href={`https://www.amazon.com/s?k=${encodeURIComponent(name)}`}
+            href={`https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-200 px-2.5 py-0.5 text-[10px] font-semibold text-accent-600 hover:bg-accent-100 transition-colors"
@@ -185,7 +187,18 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
             </svg>
-            Buy
+            Amazon
+          </a>
+          <a
+            href={`https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+            </svg>
+            Walmart
           </a>
         </div>
       </div>
@@ -193,22 +206,9 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
   );
 }
 
-function Tag({
-  label,
-  variant = "default",
-}: {
-  label: string;
-  variant?: "default" | "accent";
-}) {
-  const cls =
-    variant === "accent"
-      ? "bg-gradient-to-r from-accent-100 to-rose-100 text-accent-700 border border-accent-200"
-      : "bg-bg-secondary text-txt-muted border border-accent-100/50";
-
+function Tag({ label }: { label: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${cls}`}
-    >
+    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize bg-bg-secondary text-txt-muted border border-accent-100/50">
       {label}
     </span>
   );

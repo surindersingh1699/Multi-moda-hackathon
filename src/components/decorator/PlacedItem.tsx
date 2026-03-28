@@ -28,6 +28,8 @@ export default function PlacedItem({
   const itemRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef({ x: 0, y: 0 });
   const posRef = useRef({ x: placement.x, y: placement.y });
+  const canvasRectRef = useRef<DOMRect | null>(null);
+  const rafRef = useRef<number>(0);
 
   const size = CATEGORY_SIZES[placement.item.category];
 
@@ -38,6 +40,11 @@ export default function PlacedItem({
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       setIsDragging(true);
 
+      // Cache canvas rect once at drag start instead of every move
+      if (canvasRef.current) {
+        canvasRectRef.current = canvasRef.current.getBoundingClientRect();
+      }
+
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       offsetRef.current = {
         x: e.clientX - (rect.left + rect.width / 2),
@@ -45,32 +52,40 @@ export default function PlacedItem({
       };
       posRef.current = { x: placement.x, y: placement.y };
     },
-    [placement.x, placement.y]
+    [placement.x, placement.y, canvasRef]
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isDragging || !canvasRef.current || !itemRef.current) return;
+      if (!isDragging || !canvasRectRef.current || !itemRef.current) return;
       e.preventDefault();
 
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      const { x, y } = pageToCanvasPercent(
-        e.clientX - offsetRef.current.x,
-        e.clientY - offsetRef.current.y,
-        canvasRect
-      );
-      const clamped = clampToCanvas(x, y);
+      const clientX = e.clientX;
+      const clientY = e.clientY;
 
-      // Direct DOM update for smooth dragging (no React re-render during drag)
-      itemRef.current.style.left = `${clamped.x}%`;
-      itemRef.current.style.top = `${clamped.y}%`;
-      posRef.current = clamped;
+      // Throttle DOM updates to one per animation frame
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        if (!canvasRectRef.current || !itemRef.current) return;
+        const { x, y } = pageToCanvasPercent(
+          clientX - offsetRef.current.x,
+          clientY - offsetRef.current.y,
+          canvasRectRef.current
+        );
+        const clamped = clampToCanvas(x, y);
+
+        itemRef.current.style.left = `${clamped.x}%`;
+        itemRef.current.style.top = `${clamped.y}%`;
+        posRef.current = clamped;
+      });
     },
-    [isDragging, canvasRef]
+    [isDragging]
   );
 
   const onPointerUp = useCallback(
     (e: React.PointerEvent) => {
+      cancelAnimationFrame(rafRef.current);
+      canvasRectRef.current = null;
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
       setIsDragging(false);
       // Commit final position to React state
@@ -108,10 +123,10 @@ export default function PlacedItem({
         {/* Icon badge */}
         <div
           className={`
-            relative rounded-xl p-2 backdrop-blur-sm transition-shadow duration-200
+            relative rounded-xl p-2 transition-shadow duration-200
             ${isDragging
-              ? "bg-white/80 shadow-lg shadow-accent-400/30"
-              : "bg-white/70 shadow-md shadow-accent-400/20"
+              ? "bg-white/95 shadow-lg shadow-accent-400/30"
+              : "bg-white/90 shadow-md shadow-accent-400/20"
             }
             ${isHighlighted ? "ring-2 ring-accent-400" : ""}
           `}
@@ -145,7 +160,7 @@ export default function PlacedItem({
         </div>
 
         {/* Name label */}
-        <span className="text-[9px] font-semibold text-txt-primary bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded-full max-w-[80px] truncate text-center shadow-sm">
+        <span className="text-[9px] font-semibold text-txt-primary bg-white/95 px-1.5 py-0.5 rounded-full max-w-[80px] truncate text-center shadow-sm">
           {placement.item.name}
         </span>
       </div>

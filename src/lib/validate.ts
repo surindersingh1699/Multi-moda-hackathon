@@ -1,17 +1,13 @@
-import {
-  StylingResult,
-  StylingItem,
-  VALID_CATEGORIES,
-  VALID_STORES,
-  type Category,
-  type Store,
-} from "./schema";
+import { StylingResult, StylingItem } from "./schema";
 
 type ValidationOk = { ok: true; data: StylingResult };
 type ValidationErr = { ok: false; error: string };
 
 /** Strict validation used server-side (rejects invalid responses). */
-export function validateResult(data: unknown): ValidationOk | ValidationErr {
+export function validateResult(
+  data: unknown,
+  budget = 150
+): ValidationOk | ValidationErr {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return { ok: false, error: "Response is not a valid object" };
   }
@@ -32,10 +28,10 @@ export function validateResult(data: unknown): ValidationOk | ValidationErr {
     return { ok: false, error: `Expected 4-6 items, got ${r.items.length}` };
   }
 
-  if (r.total_estimated_cost > 150) {
+  if (r.total_estimated_cost > budget) {
     return {
       ok: false,
-      error: `Total cost $${r.total_estimated_cost} exceeds $150 budget`,
+      error: `Total cost $${r.total_estimated_cost} exceeds $${budget} budget`,
     };
   }
 
@@ -47,32 +43,19 @@ export function validateResult(data: unknown): ValidationOk | ValidationErr {
     if (typeof it.name !== "string" || typeof it.reason !== "string") {
       return { ok: false, error: "Item missing name or reason" };
     }
-    if (!(VALID_CATEGORIES as readonly string[]).includes(it.category as string)) {
-      return { ok: false, error: `Invalid category: ${it.category}` };
+    if (typeof it.category !== "string" || !it.category) {
+      return { ok: false, error: `Missing category for ${it.name}` };
     }
-    if (!(VALID_STORES as readonly string[]).includes(it.suggested_store as string)) {
-      return { ok: false, error: `Invalid store: ${it.suggested_store}` };
+    if (typeof it.suggested_store !== "string" || !it.suggested_store) {
+      return { ok: false, error: `Missing store for ${it.name}` };
     }
-    if (typeof it.placement_x !== "number" || it.placement_x < 0 || it.placement_x > 100) {
-      return { ok: false, error: `Invalid placement_x for ${it.name}` };
-    }
-    if (typeof it.placement_y !== "number" || it.placement_y < 0 || it.placement_y > 100) {
-      return { ok: false, error: `Invalid placement_y for ${it.name}` };
+    if (typeof it.search_query !== "string" || !it.search_query) {
+      return { ok: false, error: `Missing search_query for ${it.name}` };
     }
   }
 
   return { ok: true, data: data as StylingResult };
 }
-
-// Default placement positions (staggered) when AI doesn't provide coordinates
-const DEFAULT_POSITIONS = [
-  { x: 50, y: 40 },
-  { x: 25, y: 25 },
-  { x: 75, y: 30 },
-  { x: 30, y: 70 },
-  { x: 70, y: 65 },
-  { x: 50, y: 80 },
-];
 
 /** Lenient client-side parse: validates shape and fills safe defaults for missing fields. */
 export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
@@ -109,34 +92,30 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
     const it = raw as Record<string, unknown>;
     if (typeof it.name !== "string" || !it.name) continue;
 
-    const fallback = DEFAULT_POSITIONS[items.length] ?? { x: 50, y: 50 };
-
     const parsed: StylingItem = {
       name: it.name,
-      category: (VALID_CATEGORIES as readonly string[]).includes(it.category as string)
-        ? (it.category as Category)
-        : "accessories",
+      category:
+        typeof it.category === "string" && it.category
+          ? it.category
+          : "accent piece",
       estimated_price:
         typeof it.estimated_price === "number" && isFinite(it.estimated_price)
           ? it.estimated_price
           : 0,
       priority:
         typeof it.priority === "number" ? it.priority : items.length + 1,
-      suggested_store: (VALID_STORES as readonly string[]).includes(it.suggested_store as string)
-        ? (it.suggested_store as Store)
-        : "Amazon",
+      suggested_store:
+        typeof it.suggested_store === "string" && it.suggested_store
+          ? it.suggested_store
+          : "Amazon",
       reason:
         typeof it.reason === "string" && it.reason
           ? it.reason
           : "Suggested for your room.",
-      placement_x:
-        typeof it.placement_x === "number" && it.placement_x >= 0 && it.placement_x <= 100
-          ? it.placement_x
-          : fallback.x,
-      placement_y:
-        typeof it.placement_y === "number" && it.placement_y >= 0 && it.placement_y <= 100
-          ? it.placement_y
-          : fallback.y,
+      search_query:
+        typeof it.search_query === "string" && it.search_query
+          ? it.search_query
+          : it.name,
     };
 
     items.push(parsed);

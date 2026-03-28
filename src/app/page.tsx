@@ -3,12 +3,13 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import ImageUpload from "@/components/ImageUpload";
 import ResultsDisplay from "@/components/ResultsDisplay";
-import RoomDecorator from "@/components/decorator/RoomDecorator";
-import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, FloatingDoodles } from "@/components/DoodleElements";
+import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
 import type { StylingResult } from "@/lib/schema";
 
 type AppState = "idle" | "loading" | "error" | "results";
+
+const BUDGET_OPTIONS = [50, 100, 150] as const;
 
 export default function Home() {
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -17,12 +18,21 @@ export default function Home() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [result, setResult] = useState<StylingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userPrompt, setUserPrompt] = useState("");
+  const [budget, setBudget] = useState<number>(150);
+
+  // Phase 2: styled room image state
+  const [styledImageUrl, setStyledImageUrl] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageGenFailed, setImageGenFailed] = useState(false);
 
   const onImageSelected = useCallback((f: File, url: string) => {
     setFile(f);
     setPreviewUrl(url);
     setResult(null);
     setError(null);
+    setStyledImageUrl(null);
+    setImageGenFailed(false);
     setAppState("idle");
   }, []);
 
@@ -30,13 +40,19 @@ export default function Home() {
     if (!file) return;
     setAppState("loading");
     setError(null);
+    setStyledImageUrl(null);
+    setImageGenFailed(false);
 
     try {
       const base64 = await fileToBase64(file);
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64 }),
+        body: JSON.stringify({
+          image: base64,
+          userPrompt: userPrompt.trim() || undefined,
+          budget,
+        }),
       });
 
       if (!res.ok) {
@@ -52,9 +68,41 @@ export default function Home() {
 
       setResult(parsed.data);
       setAppState("results");
+
+      // Phase 2: Fire styled room generation in background
+      generateStyledRoom(base64, parsed.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setAppState("error");
+    }
+  };
+
+  const generateStyledRoom = async (imageBase64: string, analysisResult: StylingResult) => {
+    setIsGeneratingImage(true);
+    try {
+      const res = await fetch("/api/generate-styled-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64,
+          styleDirection: analysisResult.style_direction,
+          items: analysisResult.items.map((i) => ({
+            name: i.name,
+            category: i.category,
+            reason: i.reason,
+          })),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.styledImageUrl) {
+          setStyledImageUrl(data.styledImageUrl);
+        }
+      }
+    } catch {
+      setImageGenFailed(true);
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -70,14 +118,14 @@ export default function Home() {
     setPreviewUrl(null);
     setResult(null);
     setError(null);
+    setStyledImageUrl(null);
+    setImageGenFailed(false);
+    setUserPrompt("");
     setAppState("idle");
   };
 
   return (
     <div className="min-h-screen relative">
-      {/* ── Floating doodle background ── */}
-      <FloatingDoodles />
-
       {/* ── Sticky Frosted Header ── */}
       <header className="sticky top-0 z-50 border-b border-accent-100 bg-bg-card/80 backdrop-blur-xl">
         <div className="mx-auto max-w-2xl px-4 py-3.5 flex items-center gap-3">
@@ -94,7 +142,7 @@ export default function Home() {
               Budget Cozy Bedroom Stylist
             </h1>
             <p className="text-xs text-txt-muted">
-              Affordable styling magic for your space
+              AI-powered room makeovers on a real budget
             </p>
           </div>
         </div>
@@ -108,7 +156,6 @@ export default function Home() {
             {/* Hero section with doodle bear — only when no file selected */}
             {!file && appState !== "loading" && (
               <div className="text-center py-4 space-y-4">
-                {/* Doodle bear scene */}
                 <div className="flex items-end justify-center gap-3 mb-2">
                   <DoodleStar className="w-6 h-6 animate-twinkle self-start mt-2" />
                   <DoodleBear className="w-28 h-28 sm:w-32 sm:h-32 animate-wiggle" />
@@ -125,7 +172,7 @@ export default function Home() {
                   </span>
                 </h2>
                 <p className="text-txt-secondary text-base max-w-md mx-auto leading-relaxed">
-                  Snap a photo of your room and get curated, affordable styling ideas powered by AI.
+                  Snap a photo of your room and get AI-powered makeover ideas — like your favorite TikTok room transformations.
                 </p>
                 <p className="text-accent-400 text-sm font-medium">
                   Let&apos;s make your room cozy!
@@ -138,24 +185,66 @@ export default function Home() {
               disabled={appState === "loading"}
             />
 
+            {/* Style preferences — shown after image selected */}
             {file && appState !== "loading" && (
-              <button
-                onClick={analyze}
-                className="group w-full mt-6 rounded-xl px-4 py-3.5 text-sm font-semibold text-txt-on-accent transition-all duration-300 active:scale-[0.98]"
-                style={{
-                  background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)',
-                  boxShadow: 'none',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px rgba(232, 117, 58, 0.4)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
-                  </svg>
-                  Style My Room
-                </span>
-              </button>
+              <div className="mt-5 space-y-4">
+                {/* Style prompt */}
+                <div>
+                  <label htmlFor="style-prompt" className="block text-xs font-semibold text-txt-muted uppercase tracking-wider mb-1.5">
+                    Describe your vibe (optional)
+                  </label>
+                  <input
+                    id="style-prompt"
+                    type="text"
+                    value={userPrompt}
+                    onChange={(e) => setUserPrompt(e.target.value)}
+                    placeholder="cozy and warm, minimalist, boho, dark academia..."
+                    className="w-full rounded-xl border border-accent-200 bg-bg-card px-4 py-3 text-sm text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                {/* Budget selector */}
+                <div>
+                  <label className="block text-xs font-semibold text-txt-muted uppercase tracking-wider mb-1.5">
+                    Budget
+                  </label>
+                  <div className="flex gap-2">
+                    {BUDGET_OPTIONS.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setBudget(opt)}
+                        className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                          budget === opt
+                            ? "text-txt-on-accent shadow-sm"
+                            : "bg-bg-card border border-accent-200 text-txt-secondary hover:border-accent-400"
+                        }`}
+                        style={budget === opt ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
+                      >
+                        ${opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Analyze button */}
+                <button
+                  onClick={analyze}
+                  className="group w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-txt-on-accent transition-all duration-300 active:scale-[0.98]"
+                  style={{
+                    background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)',
+                    boxShadow: 'none',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px rgba(232, 117, 58, 0.4)'}
+                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
+                    </svg>
+                    Style My Room
+                  </span>
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -175,7 +264,7 @@ export default function Home() {
                 </span>
               </p>
               <p className="text-xs text-txt-muted text-center mt-1">
-                Finding the coziest suggestions for your room
+                Finding the best makeover ideas for your room
               </p>
             </div>
 
@@ -203,22 +292,58 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results State — Bear happy */}
+        {/* Results State */}
         {appState === "results" && result && (
           <div ref={resultsRef} className="space-y-6 animate-fadeIn">
             {/* Happy bear header */}
             <div className="flex items-center justify-center gap-3">
               <DoodleBearHappy className="w-12 h-12" />
               <p className="text-sm font-medium text-accent-500">
-                Here&apos;s what I found for you!
+                Here&apos;s your room makeover plan!
               </p>
               <DoodleStar className="w-5 h-5 animate-twinkle" />
             </div>
 
-            {previewUrl && (
-              <RoomDecorator previewUrl={previewUrl} items={result.items} />
+            {/* Before/After Slider — Phase 2 */}
+            {styledImageUrl && previewUrl && (
+              <div className="animate-fadeIn">
+                <BeforeAfterSlider
+                  beforeSrc={previewUrl}
+                  afterSrc={styledImageUrl}
+                />
+              </div>
             )}
-            <ResultsDisplay result={result} />
+
+            {/* Styled room loading indicator */}
+            {isGeneratingImage && !styledImageUrl && (
+              <div className="rounded-2xl bg-bg-card border border-accent-100 p-5 text-center animate-fadeIn"
+                style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
+              >
+                <p className="text-xs font-medium text-txt-secondary">
+                  Creating your styled room preview...
+                </p>
+                <div className="w-40 h-1.5 rounded-full overflow-hidden mt-2.5 mx-auto">
+                  <div className="h-full w-full animate-shimmer rounded-full" />
+                </div>
+                <p className="text-[10px] text-txt-muted mt-2">
+                  This takes 15-30 seconds
+                </p>
+              </div>
+            )}
+
+            {/* Graceful error when image generation fails */}
+            {imageGenFailed && !styledImageUrl && !isGeneratingImage && (
+              <div className="rounded-2xl bg-accent-50 border border-accent-200 p-4 text-center animate-fadeIn"
+                style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
+              >
+                <p className="text-xs font-medium text-accent-600">
+                  Styled preview unavailable — but your shopping list is ready below!
+                </p>
+              </div>
+            )}
+
+            <ResultsDisplay result={result} budget={budget} />
+
             <button
               onClick={reset}
               className="w-full rounded-xl border-2 border-dashed border-accent-200 px-4 py-3.5 text-sm font-medium text-accent-500 transition-all duration-300 hover:border-accent-400 hover:bg-accent-50 hover:shadow-sm"
@@ -233,6 +358,80 @@ export default function Home() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/* ── Before/After Slider (inline for now, Phase 2) ── */
+function BeforeAfterSlider({ beforeSrc, afterSrc }: { beforeSrc: string; afterSrc: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState(50);
+  const isDragging = useRef(false);
+
+  const handleMove = useCallback((clientX: number) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    setPosition(Math.max(2, Math.min(98, x)));
+  }, []);
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-txt-muted text-center flex items-center gap-2">
+        <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
+        Your Room, Transformed
+        <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
+      </h3>
+      <div
+        ref={containerRef}
+        className="relative w-full rounded-2xl overflow-hidden border border-accent-100 cursor-col-resize select-none"
+        style={{ aspectRatio: "16/10", boxShadow: '0 2px 8px rgba(44,24,16,0.1)' }}
+        onPointerDown={(e) => {
+          isDragging.current = true;
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          handleMove(e.clientX);
+        }}
+        onPointerMove={(e) => {
+          if (isDragging.current) handleMove(e.clientX);
+        }}
+        onPointerUp={() => { isDragging.current = false; }}
+      >
+        {/* After image (full) */}
+        <img src={afterSrc} alt="Styled room" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+
+        {/* Before image (clipped) */}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
+          <img
+            src={beforeSrc}
+            alt="Original room"
+            className="absolute inset-0 h-full object-cover"
+            style={{ width: `${containerRef.current?.offsetWidth ?? 9999}px`, maxWidth: 'none' }}
+            draggable={false}
+          />
+        </div>
+
+        {/* Slider line */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white z-10"
+          style={{ left: `${position}%`, boxShadow: '0 0 8px rgba(0,0,0,0.3)' }}
+        >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white flex items-center justify-center"
+            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+          >
+            <svg className="w-5 h-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l-4 5 4 5M16 7l4 5-4 5" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Labels */}
+        <span className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider bg-black/50 text-white px-2.5 py-1 rounded-full z-20 backdrop-blur-sm">
+          Before
+        </span>
+        <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider bg-black/50 text-white px-2.5 py-1 rounded-full z-20 backdrop-blur-sm">
+          After
+        </span>
+      </div>
     </div>
   );
 }

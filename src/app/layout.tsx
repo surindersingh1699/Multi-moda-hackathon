@@ -28,14 +28,6 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen flex flex-col relative">
-        {/* Subtle dot-pattern texture overlay */}
-        <div
-          className="fixed inset-0 -z-10 pointer-events-none opacity-[0.03]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, #2C1810 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
         {children}
       </body>
     </html>

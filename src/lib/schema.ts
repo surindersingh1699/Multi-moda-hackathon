@@ -1,32 +1,11 @@
-export const VALID_CATEGORIES = [
-  "textiles",
-  "lighting",
-  "wall_decor",
-  "plants",
-  "accessories",
-  "furniture",
-] as const;
-
-export const VALID_STORES = [
-  "Target",
-  "Walmart",
-  "Amazon",
-  "HomeGoods",
-  "IKEA",
-] as const;
-
-export type Category = (typeof VALID_CATEGORIES)[number];
-export type Store = (typeof VALID_STORES)[number];
-
 export interface StylingItem {
   name: string;
-  category: Category;
+  category: string;
   estimated_price: number;
   priority: number;
-  suggested_store: Store;
+  suggested_store: string;
   reason: string;
-  placement_x: number;
-  placement_y: number;
+  search_query: string;
 }
 
 export interface StylingResult {
@@ -54,19 +33,12 @@ export const RESPONSE_FORMAT = {
             type: "object",
             properties: {
               name: { type: "string" },
-              category: {
-                type: "string",
-                enum: [...VALID_CATEGORIES],
-              },
+              category: { type: "string" },
               estimated_price: { type: "number" },
               priority: { type: "number" },
-              suggested_store: {
-                type: "string",
-                enum: [...VALID_STORES],
-              },
+              suggested_store: { type: "string" },
               reason: { type: "string" },
-              placement_x: { type: "number" },
-              placement_y: { type: "number" },
+              search_query: { type: "string" },
             },
             required: [
               "name",
@@ -75,8 +47,7 @@ export const RESPONSE_FORMAT = {
               "priority",
               "suggested_store",
               "reason",
-              "placement_x",
-              "placement_y",
+              "search_query",
             ],
             additionalProperties: false,
           },

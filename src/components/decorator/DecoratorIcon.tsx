@@ -1,4 +1,3 @@
-import type { Category } from "@/lib/schema";
 import {
   DoodlePillow,
   DoodleLamp,
@@ -7,22 +6,22 @@ import {
   DoodleAccessory,
 } from "@/components/DoodleElements";
 
-const ICON_MAP: Record<Category, React.ComponentType<{ className?: string }>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   textiles: DoodlePillow,
   lighting: DoodleLamp,
   wall_decor: DoodleFrame,
   plants: DoodlePlant,
   accessories: DoodleAccessory,
-  furniture: DoodlePillow, // reuse pillow for furniture (closest match)
+  furniture: DoodlePillow,
 };
 
 export function DecoratorIcon({
   category,
   className = "w-8 h-8",
 }: {
-  category: Category;
+  category: string;
   className?: string;
 }) {
-  const Icon = ICON_MAP[category];
+  const Icon = ICON_MAP[category] ?? DoodlePillow;
   return <Icon className={className} />;
 }

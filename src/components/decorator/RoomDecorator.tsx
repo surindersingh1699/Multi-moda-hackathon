@@ -15,8 +15,8 @@ function buildInitialPlacements(items: StylingItem[]): PlacedItemData[] {
   return items.map((item) => ({
     id: item.name,
     item,
-    x: item.placement_x,
-    y: item.placement_y,
+    x: 50,
+    y: 50,
   }));
 }
 
@@ -53,8 +53,8 @@ export default function RoomDecorator({ previewUrl, items }: RoomDecoratorProps)
           {
             id: item.name,
             item,
-            x: item.placement_x,
-            y: item.placement_y,
+            x: 50,
+            y: 50,
           },
         ]);
       }

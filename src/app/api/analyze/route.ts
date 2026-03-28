@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { SYSTEM_PROMPT } from "@/lib/prompt";
+import { buildPromptWithPreferences } from "@/lib/prompt";
 import { RESPONSE_FORMAT } from "@/lib/schema";
 import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { image } = await req.json();
+    const { image, userPrompt, budget } = await req.json();
 
     if (!image || typeof image !== "string") {
       return NextResponse.json(
@@ -33,18 +33,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const budgetNum =
+      typeof budget === "number" && budget > 0 ? budget : 150;
+
     // Mock mode when no API key is set
     if (!process.env.OPENAI_API_KEY) {
-      // Simulate a brief delay for realistic UX
       await new Promise((r) => setTimeout(r, 1500));
       return NextResponse.json(MOCK_RESULT);
     }
 
     const openai = new OpenAI();
+    const systemPrompt = buildPromptWithPreferences(userPrompt, budgetNum);
 
-    const result = await callModel(openai, image);
+    const result = await callModel(openai, image, systemPrompt);
 
-    const validation = validateResult(result);
+    const validation = validateResult(result, budgetNum);
     if (validation.ok) {
       return NextResponse.json(validation.data);
     }
@@ -53,10 +56,11 @@ export async function POST(req: NextRequest) {
     const retryResult = await callModel(
       openai,
       image,
-      `Your previous response failed validation: ${validation.error}. Please fix and return valid JSON with exactly 4-6 items and total cost under $150.`
+      systemPrompt,
+      `Your previous response failed validation: ${validation.error}. Please fix and return valid JSON with exactly 4-6 items and total cost under $${budgetNum}.`
     );
 
-    const retryValidation = validateResult(retryResult);
+    const retryValidation = validateResult(retryResult, budgetNum);
     if (retryValidation.ok) {
       return NextResponse.json(retryValidation.data);
     }
@@ -76,10 +80,11 @@ export async function POST(req: NextRequest) {
 async function callModel(
   openai: OpenAI,
   imageDataUrl: string,
+  systemPrompt: string,
   retryHint?: string
 ): Promise<unknown> {
   const messages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt },
     {
       role: "user",
       content: [

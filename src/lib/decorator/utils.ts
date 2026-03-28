@@ -1,5 +1,3 @@
-import type { Category } from "@/lib/schema";
-
 /** Convert page-space pointer coordinates to canvas-relative percentages. */
 export function pageToCanvasPercent(
   clientX: number,
@@ -23,7 +21,7 @@ export function clampToCanvas(x: number, y: number): { x: number; y: number } {
 }
 
 /** Icon sizes per category as percentage of canvas dimensions. */
-export const CATEGORY_SIZES: Record<Category, { w: number; h: number }> = {
+export const CATEGORY_SIZES: Record<string, { w: number; h: number }> = {
   textiles: { w: 10, h: 8 },
   lighting: { w: 8, h: 12 },
   wall_decor: { w: 10, h: 8 },
