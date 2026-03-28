@@ -44,6 +44,8 @@ export default function Home() {
   const [styledImageUrl, setStyledImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageGenFailed, setImageGenFailed] = useState(false);
+  const [apiDone, setApiDone] = useState(false);
+  const pendingResultRef = useRef<{ data: StylingResult; base64: string } | null>(null);
 
   const onImageSelected = useCallback((f: File, url: string) => {
     setFile(f);
@@ -53,12 +55,17 @@ export default function Home() {
     setStyledImageUrl(null);
     setImageGenFailed(false);
     setActiveVibe(null);
+    setApiDone(false);
+    pendingResultRef.current = null;
     setAppState("idle");
   }, []);
 
   const analyze = async (promptOverride?: string) => {
     if (!file) return;
     setAppState("loading");
+    setLoadingStep(0);
+    setApiDone(false);
+    pendingResultRef.current = null;
     setError(null);
     setStyledImageUrl(null);
     setImageGenFailed(false);
@@ -88,11 +95,9 @@ export default function Home() {
         throw new Error(`Invalid response: ${parsed.error}`);
       }
 
-      setResult(parsed.data);
-      setAppState("results");
-
-      // Phase 2: Fire styled room generation in background
-      generateStyledRoom(base64, parsed.data);
+      // Buffer result — reveal after loading animation completes
+      pendingResultRef.current = { data: parsed.data, base64 };
+      setApiDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setAppState("error");
@@ -177,20 +182,35 @@ export default function Home() {
     }
   }, [appState]);
 
-  // Rotate loading step messages
+  // Rotate loading step messages — speeds up once API returns
   useEffect(() => {
-    if (appState !== "loading") {
-      setLoadingStep(0);
-      return;
-    }
-    setLoadingStep(0);
+    if (appState !== "loading") return;
+    const speed = apiDone ? 600 : 2000;
     const interval = setInterval(() => {
       setLoadingStep((prev) =>
         prev < LOADING_STEPS.length - 1 ? prev + 1 : prev
       );
-    }, 2000);
+    }, speed);
     return () => clearInterval(interval);
-  }, [appState]);
+  }, [appState, apiDone]);
+
+  // Reveal results once loading steps finish and API is done
+  useEffect(() => {
+    if (appState !== "loading" || !apiDone || loadingStep < LOADING_STEPS.length - 1) return;
+    if (!pendingResultRef.current) return;
+
+    const timer = setTimeout(() => {
+      const pending = pendingResultRef.current;
+      if (!pending) return;
+      pendingResultRef.current = null;
+      setResult(pending.data);
+      setAppState("results");
+      setApiDone(false);
+      generateStyledRoom(pending.base64, pending.data);
+    }, 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appState, apiDone, loadingStep]);
 
   const rerollWithVibe = (vibe: typeof VIBE_OPTIONS[number]) => {
     setActiveVibe(vibe.label);
@@ -207,6 +227,8 @@ export default function Home() {
     setImageGenFailed(false);
     setUserPrompt("");
     setActiveVibe(null);
+    setApiDone(false);
+    pendingResultRef.current = null;
     setAppState("idle");
   };
 
