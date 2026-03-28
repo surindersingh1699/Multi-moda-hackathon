@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
-import { Ratelimit } from "@unkey/ratelimit";
 import { buildPromptWithPreferences } from "@/lib/prompt";
 import { RESPONSE_FORMAT } from "@/lib/schema";
 import { validateResult } from "@/lib/validate";
@@ -9,33 +8,8 @@ import { MOCK_RESULT } from "@/lib/mock";
 
 const MAX_PAYLOAD_BYTES = 6 * 1024 * 1024; // 6MB (covers ~4MB image as base64)
 
-// Unkey rate limiter: 10 requests per 60s per IP
-const limiter = process.env.UNKEY_ROOT_KEY
-  ? new Ratelimit({
-      rootKey: process.env.UNKEY_ROOT_KEY,
-      namespace: "roomify-analyze",
-      limit: 10,
-      duration: "60s",
-    })
-  : null;
-
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting via Unkey
-    if (limiter) {
-      const identifier =
-        req.headers.get("x-forwarded-for") ??
-        req.headers.get("x-real-ip") ??
-        "anonymous";
-      const { success } = await limiter.limit(identifier);
-      if (!success) {
-        return NextResponse.json(
-          { error: "Too many requests. Please try again in a minute." },
-          { status: 429 }
-        );
-      }
-    }
-
     const contentLength = req.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_BYTES) {
       return NextResponse.json(

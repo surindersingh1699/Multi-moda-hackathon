@@ -1,37 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Ratelimit } from "@unkey/ratelimit";
 import type { StylingItem, ProductMatch, ProductSearchResult } from "@/lib/schema";
 import { MOCK_PRODUCT_MATCHES } from "@/lib/mock";
 
 const SERPAPI_BASE = "https://serpapi.com/search.json";
 
-// Unkey rate limiter: 10 requests per 60s per IP
-const limiter = process.env.UNKEY_ROOT_KEY
-  ? new Ratelimit({
-      rootKey: process.env.UNKEY_ROOT_KEY,
-      namespace: "roomify-products",
-      limit: 10,
-      duration: "60s",
-    })
-  : null;
-
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting via Unkey
-    if (limiter) {
-      const identifier =
-        req.headers.get("x-forwarded-for") ??
-        req.headers.get("x-real-ip") ??
-        "anonymous";
-      const { success } = await limiter.limit(identifier);
-      if (!success) {
-        return NextResponse.json({
-          matches: [],
-          status: "failed",
-        } satisfies ProductSearchResult);
-      }
-    }
-
     const { items } = (await req.json()) as { items: StylingItem[] };
 
     if (!items?.length) {

@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@google/genai": "^1.47.0",
-    "@unkey/ratelimit": "^2.1.4",
     "canvas-confetti": "^1.9.4",
     "next": "16.2.1",
     "openai": "^6.33.0",
