@@ -6,7 +6,9 @@ import ImageUpload from "@/components/ImageUpload";
 import ResultsDisplay from "@/components/ResultsDisplay";
 import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCamera, DoodleLamp, DoodleHeart, DoodleFrame } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
-import type { StylingResult } from "@/lib/schema";
+import type { StylingResult, ProductMatch, ProductSearchResult } from "@/lib/schema";
+
+
 
 type AppState = "idle" | "loading" | "error" | "results";
 
@@ -44,6 +46,10 @@ export default function Home() {
   const [styledImageUrl, setStyledImageUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageGenFailed, setImageGenFailed] = useState(false);
+
+  // AI Shopping Agent state
+  const [productMatches, setProductMatches] = useState<ProductMatch[]>([]);
+  const [productSearchFailed, setProductSearchFailed] = useState(false);
   const [apiDone, setApiDone] = useState(false);
   const pendingResultRef = useRef<{ data: StylingResult; base64: string } | null>(null);
 
@@ -54,6 +60,8 @@ export default function Home() {
     setError(null);
     setStyledImageUrl(null);
     setImageGenFailed(false);
+    setProductMatches([]);
+    setProductSearchFailed(false);
     setActiveVibe(null);
     setApiDone(false);
     pendingResultRef.current = null;
@@ -96,11 +104,36 @@ export default function Home() {
       }
 
       // Buffer result — reveal after loading animation completes
+      // Product search fires post-reveal in parallel with styled image
       pendingResultRef.current = { data: parsed.data, base64 };
       setApiDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setAppState("error");
+    }
+  };
+
+  const findProducts = async (analysisResult: StylingResult) => {
+    setProductMatches([]);
+    setProductSearchFailed(false);
+    try {
+      const res = await fetch("/api/find-products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: analysisResult.items }),
+      });
+      if (res.ok) {
+        const data: ProductSearchResult = await res.json();
+        if (data.matches?.length > 0) {
+          setProductMatches(data.matches);
+        } else {
+          setProductSearchFailed(true);
+        }
+      } else {
+        setProductSearchFailed(true);
+      }
+    } catch {
+      setProductSearchFailed(true);
     }
   };
 
@@ -133,54 +166,60 @@ export default function Home() {
     }
   };
 
-  // Scroll to results + confetti + chime when they appear
+
+  // Scroll to results when they appear
   useEffect(() => {
     if (appState === "results" && resultsRef.current) {
       resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-
-      // Terracotta palette confetti burst from both sides
-      const colors = ["#E8753A", "#D4622D", "#B84E20", "#F49556", "#D4877A", "#B05E50"];
-      const end = Date.now() + 1500;
-
-      const frame = () => {
-        confetti({
-          particleCount: 3,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0, y: 0.7 },
-          colors,
-        });
-        confetti({
-          particleCount: 3,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1, y: 0.7 },
-          colors,
-        });
-        if (Date.now() < end) requestAnimationFrame(frame);
-      };
-      frame();
-
-      // Celebration chime via Web Audio API (no file needed)
-      try {
-        const ctx = new AudioContext();
-        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 major chord arpeggio
-        notes.forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = "sine";
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(ctx.currentTime + i * 0.12);
-          osc.stop(ctx.currentTime + i * 0.12 + 0.5);
-        });
-      } catch {
-        // Audio not supported — silently skip
-      }
     }
   }, [appState]);
+
+  // Celebration confetti + chime when styled room image is ready
+  useEffect(() => {
+    if (!styledImageUrl || appState !== "results") return;
+
+    // Terracotta palette confetti burst from both sides
+    const colors = ["#E8753A", "#D4622D", "#B84E20", "#F49556", "#D4877A", "#B05E50"];
+    const end = Date.now() + 1500;
+
+    const frame = () => {
+      confetti({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        colors,
+      });
+      confetti({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        colors,
+      });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+    frame();
+
+    // Celebration chime via Web Audio API (no file needed)
+    try {
+      const ctx = new AudioContext();
+      const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 major chord arpeggio
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + i * 0.12 + 0.5);
+      });
+    } catch {
+      // Audio not supported — silently skip
+    }
+  }, [styledImageUrl, appState]);
 
   // Rotate loading step messages — speeds up once API returns
   useEffect(() => {
@@ -207,6 +246,7 @@ export default function Home() {
       setAppState("results");
       setApiDone(false);
       generateStyledRoom(pending.base64, pending.data);
+      findProducts(pending.data);
     }, 800);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,6 +265,8 @@ export default function Home() {
     setError(null);
     setStyledImageUrl(null);
     setImageGenFailed(false);
+    setProductMatches([]);
+    setProductSearchFailed(false);
     setUserPrompt("");
     setActiveVibe(null);
     setApiDone(false);
@@ -489,7 +531,12 @@ export default function Home() {
               </div>
             )}
 
-            <ResultsDisplay result={result} budget={budget} />
+            <ResultsDisplay
+              result={result}
+              budget={budget}
+              productMatches={productMatches}
+              isSearchingProducts={productMatches.length === 0 && !productSearchFailed && appState === "results"}
+            />
 
             <button
               onClick={reset}

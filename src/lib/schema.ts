@@ -16,6 +16,30 @@ export interface StylingResult {
   total_estimated_cost: number;
 }
 
+/** A real product match found by the AI shopping agent */
+export interface ProductMatch {
+  /** The original item name this product matches */
+  item_name: string;
+  /** Real product title from the web */
+  product_title: string;
+  /** Actual product URL (direct link to product page) */
+  product_url: string;
+  /** Real price found online */
+  real_price: number | null;
+  /** Store name (Amazon, Walmart, Target, etc.) */
+  store: string;
+  /** Product image URL */
+  thumbnail: string | null;
+  /** Amazon ASIN for add-to-cart */
+  asin: string | null;
+}
+
+/** Response from the /api/find-products endpoint */
+export interface ProductSearchResult {
+  matches: ProductMatch[];
+  status: "complete" | "partial" | "failed";
+}
+
 /** OpenAI response_format JSON schema for strict structured output */
 export const RESPONSE_FORMAT = {
   type: "json_schema" as const,

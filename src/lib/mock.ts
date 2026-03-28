@@ -1,4 +1,4 @@
-import { StylingResult } from "./schema";
+import { StylingResult, ProductMatch } from "./schema";
 
 export const MOCK_RESULT: StylingResult = {
   room_reading:
@@ -66,3 +66,51 @@ export const MOCK_RESULT: StylingResult = {
   ],
   total_estimated_cost: 93,
 };
+
+export const MOCK_PRODUCT_MATCHES: ProductMatch[] = [
+  {
+    item_name: "Warm White LED Strip Lights",
+    product_title: "Govee LED Strip Lights 16.4ft Warm White Dimmable",
+    product_url: "https://www.amazon.com/dp/B07XBWN8WF",
+    real_price: 11.99,
+    store: "Amazon",
+    thumbnail: null,
+    asin: "B07XBWN8WF",
+  },
+  {
+    item_name: "Chunky Knit Throw Blanket",
+    product_title: "Chunky Knit Throw Blanket 50x70 Cream",
+    product_url: "https://www.amazon.com/dp/B0BXMVHGQR",
+    real_price: 22.99,
+    store: "Amazon",
+    thumbnail: null,
+    asin: "B0BXMVHGQR",
+  },
+  {
+    item_name: "Set of 3 Minimalist Gallery Frames",
+    product_title: "Gallery Wall Frame Set Black 8x10 - 3 Pack",
+    product_url: "https://www.amazon.com/dp/B08FX5LBR9",
+    real_price: 16.99,
+    store: "Amazon",
+    thumbnail: null,
+    asin: "B08FX5LBR9",
+  },
+  {
+    item_name: "Faux Eucalyptus Stems in Clear Vase",
+    product_title: "Artificial Eucalyptus Stems with Glass Vase Set",
+    product_url: "https://www.amazon.com/dp/B09N3JWDYJ",
+    real_price: 14.99,
+    store: "Amazon",
+    thumbnail: null,
+    asin: "B09N3JWDYJ",
+  },
+  {
+    item_name: "Textured Linen Throw Pillow Covers (Set of 2)",
+    product_title: "MIULEE Set of 2 Linen Throw Pillow Covers 18x18 Beige",
+    product_url: "https://www.amazon.com/dp/B07WFNRHQM",
+    real_price: 13.99,
+    store: "Amazon",
+    thumbnail: null,
+    asin: "B07WFNRHQM",
+  },
+];

@@ -1,12 +1,27 @@
-import type { StylingResult, StylingItem } from "@/lib/schema";
+import { useState } from "react";
+import type { StylingResult, StylingItem, ProductMatch } from "@/lib/schema";
 import { DoodlePillow, DoodleLamp, DoodlePlant, DoodleHeart } from "@/components/DoodleElements";
 
 interface Props {
   result: StylingResult;
   budget?: number;
+  productMatches?: ProductMatch[];
+  isSearchingProducts?: boolean;
 }
 
-export default function ResultsDisplay({ result, budget = 150 }: Props) {
+function findMatch(item: StylingItem, matches: ProductMatch[]): ProductMatch | undefined {
+  return matches.find(
+    (m) => m.item_name.toLowerCase() === item.name.toLowerCase(),
+  );
+}
+
+export default function ResultsDisplay({
+  result,
+  budget = 150,
+  productMatches = [],
+  isSearchingProducts = false,
+}: Props) {
+  const [copiedList, setCopiedList] = useState(false);
   const items = result.items ?? [];
   const totalCost =
     typeof result.total_estimated_cost === "number" && isFinite(result.total_estimated_cost)
@@ -20,6 +35,21 @@ export default function ResultsDisplay({ result, budget = 150 }: Props) {
 
   const barColor =
     budgetPercent < 60 ? '#7EA86A' : budgetPercent < 85 ? '#E8753A' : '#DC2626';
+
+  const handleCopyList = () => {
+    const lines = items.map((item) => {
+      const match = findMatch(item, productMatches);
+      const price = match?.real_price ?? item.estimated_price;
+      const url = match?.product_url ?? `https://www.amazon.com/s?k=${encodeURIComponent(item.search_query || item.name)}`;
+      return `${item.name} — $${price} — ${url}`;
+    });
+    const text = `My Room Makeover List ($${totalCost})\n${lines.join("\n")}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedList(true);
+      setTimeout(() => setCopiedList(false), 2000);
+    });
+  };
+
 
   return (
     <div className="space-y-5">
@@ -69,12 +99,57 @@ export default function ResultsDisplay({ result, budget = 150 }: Props) {
           What to Buy
           <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
         </h2>
+
+        {/* Shopping Agent Status */}
+        {isSearchingProducts && (
+          <div className="flex items-center gap-2 mb-3 px-1 animate-fadeIn">
+            <svg className="w-4 h-4 text-sage-400 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <p className="text-xs font-medium text-sage-400">
+              AI Shopping Agent finding real products...
+            </p>
+          </div>
+        )}
+        {!isSearchingProducts && productMatches.length > 0 && (
+          <div className="flex items-center gap-2 mb-3 px-1 animate-fadeIn">
+            <svg className="w-4 h-4 text-sage-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="text-xs font-medium text-sage-400">
+              Found {productMatches.length} real product links!
+            </p>
+          </div>
+        )}
+
         <div className="grid gap-3">
           {items.map((item, index) => (
-            <ItemCard key={index} item={item} index={index} />
+            <ItemCard
+              key={index}
+              item={item}
+              index={index}
+              match={findMatch(item, productMatches)}
+              isSearching={isSearchingProducts}
+            />
           ))}
         </div>
       </section>
+
+      {/* ── Shopping Actions ── */}
+      <div className="animate-fadeIn flex gap-2">
+        <button
+          onClick={handleCopyList}
+          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold bg-bg-card border border-accent-200 text-txt-secondary transition-all duration-200 hover:bg-accent-50 active:scale-[0.98]"
+        >
+          <span className="flex items-center justify-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+            {copiedList ? "Copied!" : "Copy Shopping List"}
+          </span>
+        </button>
+      </div>
 
       {/* ── Buy Order — Timeline ── */}
       <section
@@ -138,7 +213,17 @@ export default function ResultsDisplay({ result, budget = 150 }: Props) {
   );
 }
 
-function ItemCard({ item, index }: { item: StylingItem; index: number }) {
+function ItemCard({
+  item,
+  index,
+  match,
+  isSearching,
+}: {
+  item: StylingItem;
+  index: number;
+  match?: ProductMatch;
+  isSearching?: boolean;
+}) {
   const name = item.name || "Unnamed item";
   const price = typeof item.estimated_price === "number" ? item.estimated_price : 0;
   const category = item.category || "item";
@@ -155,21 +240,41 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
       onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(44,24,16,0.08)'}
       onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 1px 3px rgba(44,24,16,0.06)'}
     >
-      {/* Priority badge */}
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-txt-on-accent shadow-sm"
-        style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
-      >
-        {item.priority ?? index + 1}
-      </div>
+      {/* Product thumbnail or priority badge */}
+      {match?.thumbnail ? (
+        <img
+          src={match.thumbnail}
+          alt={match.product_title}
+          className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-sm border border-accent-100/50"
+        />
+      ) : (
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-txt-on-accent shadow-sm"
+          style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
+        >
+          {item.priority ?? index + 1}
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-txt-primary">{name}</h3>
-          <span className="shrink-0 text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg">
-            ${price}
-          </span>
+          <div className="shrink-0 flex items-center gap-1.5">
+            {match && match.real_price != null && match.real_price !== price && (
+              <span className="text-[10px] text-txt-muted line-through">${price}</span>
+            )}
+            <span className="text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg">
+              ${match?.real_price ?? price}
+            </span>
+          </div>
         </div>
+
+        {/* Show real product title if matched */}
+        {match && (
+          <p className="text-[10px] text-sage-400 font-medium mt-0.5 truncate">
+            {match.product_title}
+          </p>
+        )}
 
         <p className="mt-1.5 text-xs text-txt-muted leading-relaxed">
           {item.reason || "Recommended for your room."}
@@ -177,29 +282,57 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <Tag label={category} />
-          <Tag label={store} />
-          <a
-            href={`https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-200 px-2.5 py-0.5 text-[10px] font-semibold text-accent-600 hover:bg-accent-100 transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-            </svg>
-            Amazon
-          </a>
-          <a
-            href={`https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-            </svg>
-            Walmart
-          </a>
+          <Tag label={match?.store ?? store} />
+
+          {match ? (
+            /* Real product found — show Buy Now */
+            <a
+              href={match.product_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full bg-sage-100 border border-sage-400 px-3 py-0.5 text-[10px] font-semibold text-sage-400 hover:bg-sage-400 hover:text-white transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+              </svg>
+              Buy Now @ {match.store}
+            </a>
+          ) : (
+            /* No match — keep search links (or show shimmer if still searching) */
+            <>
+              <a
+                href={`https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-200 px-2.5 py-0.5 text-[10px] font-semibold text-accent-600 hover:bg-accent-100 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                Amazon
+              </a>
+              <a
+                href={`https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                Walmart
+              </a>
+              {isSearching && (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] text-txt-muted">
+                  <svg className="w-3 h-3 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  finding...
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
