@@ -85,7 +85,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
           <div className="relative group w-full">
             <Image
               src={preview}
-              alt="Bedroom preview"
+              alt="Room preview"
               width={400}
               height={300}
               className="rounded-xl object-cover max-h-64 w-full"
@@ -108,7 +108,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
               <DoodleStar className="w-4 h-4 absolute -top-1 -right-2 animate-twinkle" />
             </div>
             <p className="text-sm font-medium text-txt-secondary">
-              Drop a bedroom photo here or{" "}
+              Drop a room photo here or{" "}
               <span className="text-accent-500 font-semibold underline decoration-accent-200 underline-offset-2 decoration-2">
                 browse
               </span>

@@ -3,26 +3,17 @@ import { DoodlePillow, DoodleLamp, DoodlePlant, DoodleHeart } from "@/components
 
 interface Props {
   result: StylingResult;
+  activeItems: StylingItem[];
+  onRemoveItem: (name: string) => void;
 }
 
-export default function ResultsDisplay({ result }: Props) {
-  const items = result.items ?? [];
-  const totalCost =
-    typeof result.total_estimated_cost === "number" && isFinite(result.total_estimated_cost)
-      ? result.total_estimated_cost
-      : items.reduce((s, i) => s + (i.estimated_price ?? 0), 0);
-  const buyOrder = Array.isArray(result.buy_order)
-    ? result.buy_order.filter((s): s is string => typeof s === "string")
-    : items.map((i) => i.name);
-
-  const budgetPercent = Math.min(100, Math.round((totalCost / 150) * 100));
-
-  const barColor =
-    budgetPercent < 60 ? '#7EA86A' : budgetPercent < 85 ? '#E8753A' : '#DC2626';
+export default function ResultsDisplay({ result, activeItems, onRemoveItem }: Props) {
+  const totalCost = activeItems.reduce((s, i) => s + (i.estimated_price ?? 0), 0);
+  const removedCount = result.items.length - activeItems.length;
 
   return (
     <div className="space-y-5">
-      {/* ── Room Reading — Quote Card ── */}
+      {/* ── Room Reading ── */}
       <section
         className="animate-slideUp stagger-1 rounded-2xl bg-bg-card border border-accent-100 p-6 relative overflow-hidden"
         style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
@@ -41,7 +32,7 @@ export default function ResultsDisplay({ result }: Props) {
         </p>
       </section>
 
-      {/* ── Style Direction — Gradient Card ── */}
+      {/* ── Style Direction ── */}
       <section
         className="animate-slideUp stagger-2 rounded-2xl p-6 relative overflow-hidden"
         style={{
@@ -62,82 +53,90 @@ export default function ResultsDisplay({ result }: Props) {
 
       {/* ── Recommended Items ── */}
       <section className="animate-slideUp stagger-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
-          <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
-          <DoodlePlant className="w-4 h-4 inline-block" />
-          Recommended Items
-          <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
-        </h2>
-        <div className="grid gap-3">
-          {items.map((item, index) => (
-            <ItemCard key={index} item={item} index={index} />
-          ))}
-        </div>
-      </section>
-
-      {/* ── Buy Order — Timeline ── */}
-      <section
-        className="animate-slideUp stagger-4 rounded-2xl bg-bg-card border border-accent-100 p-6"
-        style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
-      >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
-          <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
-          <DoodleHeart className="w-4 h-4 inline-block" />
-          Suggested Buy Order
-          <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
-        </h2>
-        <ol className="space-y-0 relative">
-          {/* Vertical connecting line */}
-          <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-accent-300 to-accent-100" />
-
-          {buyOrder.map((name, i) => (
-            <li key={`${name}-${i}`} className="relative flex items-center gap-4 py-2">
-              <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 border-accent-300 bg-bg-card text-accent-600">
-                {i + 1}
-              </div>
-              <span className="text-sm text-txt-secondary font-medium">
-                {name}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted flex items-center gap-2">
+            <span className="h-px w-8 bg-gradient-to-r from-accent-200 to-transparent" />
+            <DoodlePlant className="w-4 h-4 inline-block" />
+            Recommended Items
+          </h2>
+          <div className="flex items-center gap-3">
+            {removedCount > 0 && (
+              <span className="text-[10px] text-txt-muted">
+                {removedCount} removed
               </span>
-            </li>
+            )}
+            <span className="text-xs font-semibold text-txt-secondary bg-bg-secondary px-2.5 py-1 rounded-lg">
+              {activeItems.length} items &middot; ${totalCost}
+            </span>
+          </div>
+        </div>
+        <p className="text-[11px] text-txt-muted mb-3">
+          Sorted by impact. Remove items you don&apos;t need — your total updates automatically.
+        </p>
+        <div className="grid gap-3">
+          {activeItems.map((item, index) => (
+            <ItemCard
+              key={item.name}
+              item={item}
+              index={index}
+              onRemove={() => onRemoveItem(item.name)}
+            />
           ))}
-        </ol>
+        </div>
+        {activeItems.length === 0 && (
+          <div className="rounded-2xl border-2 border-dashed border-accent-100 p-8 text-center">
+            <p className="text-sm text-txt-muted">All items removed. Analyze again to get fresh suggestions.</p>
+          </div>
+        )}
       </section>
 
-      {/* ── Budget Tracker — Animated Bar ── */}
-      <section
-        className="animate-slideUp stagger-5 rounded-2xl bg-bg-card border border-accent-100 p-6"
-        style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
-      >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
-          <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
-          Estimated Total
-          <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
-        </h2>
-        <div className="flex items-end gap-2 mb-3">
-          <span className="text-3xl font-bold text-txt-primary">
-            ${totalCost}
-          </span>
-          <span className="text-sm text-txt-muted pb-1">/ $150 budget</span>
-        </div>
-        <div className="h-3 w-full rounded-full bg-bg-secondary overflow-hidden">
-          <div
-            className="h-3 rounded-full animate-fillBar transition-all duration-500"
-            style={{ width: `${budgetPercent}%`, background: barColor }}
-          />
-        </div>
-        <p className="text-xs text-txt-muted mt-2">
-          {budgetPercent < 60
-            ? "Great! Plenty of budget room left."
-            : budgetPercent < 85
-              ? "Looking good, staying within range."
-              : "Getting close to the budget limit."}
-        </p>
-      </section>
+      {/* ── Buy Order ── */}
+      {activeItems.length > 0 && (
+        <section
+          className="animate-slideUp stagger-4 rounded-2xl bg-bg-card border border-accent-100 p-6"
+          style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
+        >
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
+            <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
+            <DoodleHeart className="w-4 h-4 inline-block" />
+            Suggested Buy Order
+            <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
+          </h2>
+          <ol className="space-y-0 relative">
+            <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-accent-300 to-accent-100" />
+            {activeItems.map((item, i) => (
+              <li key={item.name} className="relative flex items-center gap-4 py-2">
+                <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 border-accent-300 bg-bg-card text-accent-600">
+                  {i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-txt-secondary font-medium">{item.name}</span>
+                  <span className="text-xs text-txt-muted ml-2">${item.estimated_price}</span>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          {/* Running total */}
+          <div className="mt-4 pt-4 border-t border-accent-100 flex items-center justify-between">
+            <span className="text-xs text-txt-muted">Estimated total for selected items</span>
+            <span className="text-lg font-bold text-txt-primary">${totalCost}</span>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-function ItemCard({ item, index }: { item: StylingItem; index: number }) {
+function ItemCard({
+  item,
+  index,
+  onRemove,
+}: {
+  item: StylingItem;
+  index: number;
+  onRemove: () => void;
+}) {
   const name = item.name || "Unnamed item";
   const price = typeof item.estimated_price === "number" ? item.estimated_price : 0;
   const category = item.category ? item.category.replace("_", " ") : "item";
@@ -145,7 +144,7 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
 
   return (
     <div
-      className="animate-slideUp flex gap-4 rounded-2xl bg-bg-card border border-accent-100/50 p-4 transition-all duration-300 hover:-translate-y-0.5"
+      className="animate-slideUp group flex gap-4 rounded-2xl bg-bg-card border border-accent-100/50 p-4 transition-all duration-300 hover:-translate-y-0.5"
       style={{
         animationDelay: `${0.3 + index * 0.08}s`,
         boxShadow: '0 1px 3px rgba(44,24,16,0.06)',
@@ -164,9 +163,20 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-txt-primary">{name}</h3>
-          <span className="shrink-0 text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg">
-            ${price}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg">
+              ${price}
+            </span>
+            <button
+              onClick={onRemove}
+              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex h-6 w-6 items-center justify-center rounded-full bg-err-50 text-err-400 hover:bg-err-100 hover:text-err-600"
+              title="Remove item"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <p className="mt-1.5 text-xs text-txt-muted leading-relaxed">
@@ -193,22 +203,9 @@ function ItemCard({ item, index }: { item: StylingItem; index: number }) {
   );
 }
 
-function Tag({
-  label,
-  variant = "default",
-}: {
-  label: string;
-  variant?: "default" | "accent";
-}) {
-  const cls =
-    variant === "accent"
-      ? "bg-gradient-to-r from-accent-100 to-rose-100 text-accent-700 border border-accent-200"
-      : "bg-bg-secondary text-txt-muted border border-accent-100/50";
-
+function Tag({ label }: { label: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize ${cls}`}
-    >
+    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold capitalize bg-bg-secondary text-txt-muted border border-accent-100/50">
       {label}
     </span>
   );

@@ -2,11 +2,12 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import ImageUpload from "@/components/ImageUpload";
+import RoomTypeSelector from "@/components/RoomTypeSelector";
 import ResultsDisplay from "@/components/ResultsDisplay";
 import RoomDecorator from "@/components/decorator/RoomDecorator";
 import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, FloatingDoodles } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
-import type { StylingResult } from "@/lib/schema";
+import type { StylingResult, StylingItem } from "@/lib/schema";
 
 type AppState = "idle" | "loading" | "error" | "results";
 
@@ -15,19 +16,24 @@ export default function Home() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [roomType, setRoomType] = useState("");
   const [result, setResult] = useState<StylingResult | null>(null);
+  const [activeItems, setActiveItems] = useState<StylingItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const onImageSelected = useCallback((f: File, url: string) => {
     setFile(f);
     setPreviewUrl(url);
     setResult(null);
+    setActiveItems([]);
     setError(null);
     setAppState("idle");
   }, []);
 
+  const canAnalyze = file && roomType.trim().length > 0;
+
   const analyze = async () => {
-    if (!file) return;
+    if (!canAnalyze) return;
     setAppState("loading");
     setError(null);
 
@@ -36,7 +42,7 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64 }),
+        body: JSON.stringify({ image: base64, roomType: roomType.trim() }),
       });
 
       if (!res.ok) {
@@ -51,6 +57,7 @@ export default function Home() {
       }
 
       setResult(parsed.data);
+      setActiveItems(parsed.data.items);
       setAppState("results");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -58,7 +65,10 @@ export default function Home() {
     }
   };
 
-  // Scroll to results when they appear
+  const removeItem = useCallback((itemName: string) => {
+    setActiveItems((prev) => prev.filter((i) => i.name !== itemName));
+  }, []);
+
   useEffect(() => {
     if (appState === "results" && resultsRef.current) {
       resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -68,17 +78,17 @@ export default function Home() {
   const reset = () => {
     setFile(null);
     setPreviewUrl(null);
+    setRoomType("");
     setResult(null);
+    setActiveItems([]);
     setError(null);
     setAppState("idle");
   };
 
   return (
     <div className="min-h-screen relative">
-      {/* ── Floating doodle background ── */}
       <FloatingDoodles />
 
-      {/* ── Sticky Frosted Header ── */}
       <header className="sticky top-0 z-50 border-b border-accent-100 bg-bg-card/80 backdrop-blur-xl">
         <div className="mx-auto max-w-2xl px-4 py-3.5 flex items-center gap-3">
           <div
@@ -91,24 +101,20 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-txt-primary tracking-tight">
-              Budget Cozy Bedroom Stylist
+              Budget Room Stylist
             </h1>
             <p className="text-xs text-txt-muted">
-              Affordable styling magic for your space
+              AI-powered styling for any room
             </p>
           </div>
         </div>
       </header>
 
-      {/* ── Main Content ── */}
       <main className={`relative z-10 mx-auto px-4 py-8 sm:py-12 space-y-8 ${appState === "results" ? "max-w-5xl" : "max-w-2xl"}`}>
-        {/* Upload / Idle State */}
         {appState !== "results" && (
           <div className="animate-fadeIn">
-            {/* Hero section with doodle bear — only when no file selected */}
             {!file && appState !== "loading" && (
               <div className="text-center py-4 space-y-4">
-                {/* Doodle bear scene */}
                 <div className="flex items-end justify-center gap-3 mb-2">
                   <DoodleStar className="w-6 h-6 animate-twinkle self-start mt-2" />
                   <DoodleBear className="w-28 h-28 sm:w-32 sm:h-32 animate-wiggle" />
@@ -116,7 +122,7 @@ export default function Home() {
                 </div>
 
                 <h2 className="text-3xl sm:text-4xl font-bold text-txt-primary tracking-tight leading-tight">
-                  Your dream bedroom,<br />
+                  Your dream space,<br />
                   <span
                     className="bg-clip-text text-transparent"
                     style={{ backgroundImage: 'linear-gradient(to right, #E8753A, #D4877A)' }}
@@ -125,46 +131,61 @@ export default function Home() {
                   </span>
                 </h2>
                 <p className="text-txt-secondary text-base max-w-md mx-auto leading-relaxed">
-                  Snap a photo of your room and get curated, affordable styling ideas powered by AI.
+                  Snap a photo of any room and get curated, affordable styling ideas powered by AI.
                 </p>
                 <p className="text-accent-400 text-sm font-medium">
-                  Let&apos;s make your room cozy!
+                  Pick your room type and let&apos;s go!
                 </p>
               </div>
             )}
 
-            <ImageUpload
-              onImageSelected={onImageSelected}
-              disabled={appState === "loading"}
-            />
+            <div className="space-y-5">
+              <ImageUpload
+                onImageSelected={onImageSelected}
+                disabled={appState === "loading"}
+              />
 
-            {file && appState !== "loading" && (
-              <button
-                onClick={analyze}
-                className="group w-full mt-6 rounded-xl px-4 py-3.5 text-sm font-semibold text-txt-on-accent transition-all duration-300 active:scale-[0.98]"
-                style={{
-                  background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)',
-                  boxShadow: 'none',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 20px rgba(232, 117, 58, 0.4)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
-                  </svg>
-                  Style My Room
-                </span>
-              </button>
-            )}
+              {file && appState !== "loading" && (
+                <div className="animate-fadeIn rounded-2xl border border-accent-100 bg-white/60 backdrop-blur-sm p-4 sm:p-5">
+                  <RoomTypeSelector
+                    value={roomType}
+                    onChange={setRoomType}
+                    disabled={appState === "loading"}
+                  />
+                </div>
+              )}
+
+              {file && appState !== "loading" && (
+                <button
+                  onClick={analyze}
+                  disabled={!canAnalyze}
+                  className="group w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-txt-on-accent transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)',
+                    boxShadow: 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (canAnalyze) e.currentTarget.style.boxShadow = '0 0 20px rgba(232, 117, 58, 0.4)';
+                  }}
+                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
+                    </svg>
+                    {canAnalyze
+                      ? `Style My ${roomType.trim()}`
+                      : "Select a room type to continue"}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Loading State — Bear thinking */}
         {appState === "loading" && (
           <div className="flex flex-col items-center gap-4 py-10 animate-fadeIn">
             <DoodleBearThinking className="w-32 h-32 animate-float" />
-
             <div>
               <p className="text-sm font-medium text-txt-secondary text-center">
                 Hmm, let me think
@@ -175,17 +196,15 @@ export default function Home() {
                 </span>
               </p>
               <p className="text-xs text-txt-muted text-center mt-1">
-                Finding the coziest suggestions for your room
+                Finding the best suggestions for your {roomType || "room"}
               </p>
             </div>
-
             <div className="w-48 h-1.5 rounded-full overflow-hidden mt-2">
               <div className="h-full w-full animate-shimmer rounded-full" />
             </div>
           </div>
         )}
 
-        {/* Error State */}
         {appState === "error" && (
           <div className="animate-scaleBounce rounded-2xl border border-err-100 bg-err-50 p-6 text-center">
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-err-100">
@@ -203,22 +222,24 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results State — Bear happy */}
         {appState === "results" && result && (
           <div ref={resultsRef} className="space-y-6 animate-fadeIn">
-            {/* Happy bear header */}
             <div className="flex items-center justify-center gap-3">
               <DoodleBearHappy className="w-12 h-12" />
               <p className="text-sm font-medium text-accent-500">
-                Here&apos;s what I found for you!
+                Here&apos;s what I found for your {roomType || "room"}!
               </p>
               <DoodleStar className="w-5 h-5 animate-twinkle" />
             </div>
 
             {previewUrl && (
-              <RoomDecorator previewUrl={previewUrl} items={result.items} />
+              <RoomDecorator previewUrl={previewUrl} items={activeItems} />
             )}
-            <ResultsDisplay result={result} />
+            <ResultsDisplay
+              result={result}
+              activeItems={activeItems}
+              onRemoveItem={removeItem}
+            />
             <button
               onClick={reset}
               className="w-full rounded-xl border-2 border-dashed border-accent-200 px-4 py-3.5 text-sm font-medium text-accent-500 transition-all duration-300 hover:border-accent-400 hover:bg-accent-50 hover:shadow-sm"

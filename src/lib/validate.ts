@@ -10,7 +10,7 @@ import {
 type ValidationOk = { ok: true; data: StylingResult };
 type ValidationErr = { ok: false; error: string };
 
-/** Strict validation used server-side (rejects invalid responses). */
+/** Strict validation used server-side. */
 export function validateResult(data: unknown): ValidationOk | ValidationErr {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return { ok: false, error: "Response is not a valid object" };
@@ -28,15 +28,8 @@ export function validateResult(data: unknown): ValidationOk | ValidationErr {
     return { ok: false, error: "Missing required top-level fields" };
   }
 
-  if (r.items.length < 4 || r.items.length > 6) {
-    return { ok: false, error: `Expected 4-6 items, got ${r.items.length}` };
-  }
-
-  if (r.total_estimated_cost > 150) {
-    return {
-      ok: false,
-      error: `Total cost $${r.total_estimated_cost} exceeds $150 budget`,
-    };
+  if (r.items.length < 1) {
+    return { ok: false, error: "Must have at least 1 item" };
   }
 
   for (const item of r.items) {
@@ -64,17 +57,14 @@ export function validateResult(data: unknown): ValidationOk | ValidationErr {
   return { ok: true, data: data as StylingResult };
 }
 
-// Default placement positions (staggered) when AI doesn't provide coordinates
 const DEFAULT_POSITIONS = [
-  { x: 50, y: 40 },
-  { x: 25, y: 25 },
-  { x: 75, y: 30 },
-  { x: 30, y: 70 },
-  { x: 70, y: 65 },
-  { x: 50, y: 80 },
+  { x: 50, y: 40 }, { x: 25, y: 25 }, { x: 75, y: 30 },
+  { x: 30, y: 70 }, { x: 70, y: 65 }, { x: 50, y: 80 },
+  { x: 15, y: 50 }, { x: 85, y: 40 }, { x: 40, y: 20 },
+  { x: 60, y: 75 }, { x: 20, y: 85 }, { x: 80, y: 15 },
 ];
 
-/** Lenient client-side parse: validates shape and fills safe defaults for missing fields. */
+/** Lenient client-side parse: validates shape and fills safe defaults. */
 export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return { ok: false, error: "Response is not a valid object" };
@@ -109,7 +99,7 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
     const it = raw as Record<string, unknown>;
     if (typeof it.name !== "string" || !it.name) continue;
 
-    const fallback = DEFAULT_POSITIONS[items.length] ?? { x: 50, y: 50 };
+    const fallback = DEFAULT_POSITIONS[items.length % DEFAULT_POSITIONS.length];
 
     const parsed: StylingItem = {
       name: it.name,
