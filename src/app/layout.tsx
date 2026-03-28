@@ -13,8 +13,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roomify",
-  description: "AI-powered room makeovers on a real budget",
+  title: "Roomify — AI Bedroom Stylist on a Real Budget",
+  description:
+    "Upload a bedroom photo. Get a designer makeover plan with real, shoppable products from Amazon, Target & IKEA — all under your budget. Powered by GPT-4o Vision.",
+  keywords: [
+    "AI interior design",
+    "room makeover",
+    "budget bedroom",
+    "GPT-4o",
+    "hackathon",
+  ],
+  authors: [{ name: "Roomify Team" }],
+  openGraph: {
+    title: "Roomify — AI Bedroom Stylist",
+    description:
+      "Snap your bedroom. Get a designer makeover plan in 30 seconds. Real products. Real prices. Real links.",
+    type: "website",
+    siteName: "Roomify",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Roomify — AI Bedroom Stylist",
+    description:
+      "Upload a photo. Your AI interior designer does the rest.",
+  },
+  other: {
+    "theme-color": "#FDF8F4",
+  },
 };
 
 export default function RootLayout({

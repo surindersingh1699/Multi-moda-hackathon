@@ -22,6 +22,7 @@ export default function ResultsDisplay({
   isSearchingProducts = false,
 }: Props) {
   const [copiedList, setCopiedList] = useState(false);
+  const [shared, setShared] = useState(false);
   const items = result.items ?? [];
   const totalCost =
     typeof result.total_estimated_cost === "number" && isFinite(result.total_estimated_cost)
@@ -50,6 +51,23 @@ export default function ResultsDisplay({
     });
   };
 
+  const handleShare = async () => {
+    const text = `Check out my AI room makeover plan from Roomify! ${items.length} items for $${totalCost}.`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "My Room Makeover — Roomify", text });
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      } catch {
+        // User cancelled share
+      }
+    } else {
+      await navigator.clipboard.writeText(text);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
+  };
+
 
   return (
     <div className="space-y-5">
@@ -61,12 +79,13 @@ export default function ResultsDisplay({
         <div className="absolute -top-2 -left-1 text-7xl font-serif text-accent-100 leading-none select-none pointer-events-none">
           &ldquo;
         </div>
-        <h2 className="relative text-xs font-semibold uppercase tracking-wider text-txt-muted mb-3 flex items-center gap-2">
+        <h2 className="relative text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
           <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
           <DoodlePillow className="w-4 h-4 inline-block" />
           Room Reading
           <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
         </h2>
+        <p className="relative text-[10px] text-txt-muted mb-3 text-center">What our AI noticed about your space</p>
         <p className="relative text-sm text-txt-secondary leading-relaxed italic">
           {result.room_reading || "Your room has been analyzed."}
         </p>
@@ -80,12 +99,13 @@ export default function ResultsDisplay({
           boxShadow: '0 1px 3px rgba(44,24,16,0.06)',
         }}
       >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-3 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1 flex items-center gap-2">
           <span className="h-px flex-1 bg-white/20" />
           <DoodleLamp className="w-4 h-4 inline-block" />
           Style Direction
           <span className="h-px flex-1 bg-white/20" />
         </h2>
+        <p className="text-[10px] text-white/50 mb-3 text-center">The vibe we&apos;re going for</p>
         <p className="text-sm text-white leading-relaxed font-medium">
           {result.style_direction || "Cozy and inviting."}
         </p>
@@ -93,12 +113,13 @@ export default function ResultsDisplay({
 
       {/* ── Recommended Items ── */}
       <section className="animate-slideUp stagger-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
           <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
           <DoodlePlant className="w-4 h-4 inline-block" />
           What to Buy
           <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
         </h2>
+        <p className="text-[10px] text-txt-muted mb-4 text-center">{items.length} hand-picked finds for your room</p>
 
         {/* Shopping Agent Status */}
         {isSearchingProducts && (
@@ -108,7 +129,7 @@ export default function ResultsDisplay({
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             <p className="text-xs font-medium text-sage-400">
-              AI Shopping Agent finding real products...
+              Finding real products you can buy right now...
             </p>
           </div>
         )}
@@ -118,7 +139,7 @@ export default function ResultsDisplay({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <p className="text-xs font-medium text-sage-400">
-              Found {productMatches.length} real product links!
+              Found {productMatches.length} shoppable products with real prices!
             </p>
           </div>
         )}
@@ -146,7 +167,19 @@ export default function ResultsDisplay({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
-            {copiedList ? "Copied!" : "Copy Shopping List"}
+            {copiedList ? "Copied to clipboard!" : "Copy My Shopping List"}
+          </span>
+        </button>
+        <button
+          onClick={handleShare}
+          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.98]"
+          style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            {shared ? "Shared!" : "Share My Makeover"}
           </span>
         </button>
       </div>
@@ -156,12 +189,13 @@ export default function ResultsDisplay({
         className="animate-slideUp stagger-4 rounded-2xl bg-bg-card border border-accent-100 p-6"
         style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
       >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
           <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
           <DoodleHeart className="w-4 h-4 inline-block" />
           Suggested Buy Order
           <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
         </h2>
+        <p className="text-[10px] text-txt-muted mb-4 text-center">Start with the highest-impact piece</p>
         <ol className="space-y-0 relative">
           {/* Vertical connecting line */}
           <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-accent-300 to-accent-100" />
@@ -184,11 +218,12 @@ export default function ResultsDisplay({
         className="animate-slideUp stagger-5 rounded-2xl bg-bg-card border border-accent-100 p-6"
         style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
       >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-4 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
           <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
           Estimated Total
           <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
         </h2>
+        <p className="text-[10px] text-txt-muted mb-4 text-center">All prices verified against real listings</p>
         <div className="flex items-end gap-2 mb-3">
           <span className="text-3xl font-bold text-txt-primary">
             ${totalCost}
@@ -203,10 +238,12 @@ export default function ResultsDisplay({
         </div>
         <p className="text-xs text-txt-muted mt-2">
           {budgetPercent < 60
-            ? "Great! Plenty of budget room left."
+            ? "Under budget with room to spare!"
             : budgetPercent < 85
-              ? "Looking good, staying within range."
-              : "Getting close to the budget limit."}
+              ? "Right in the sweet spot. Smart spending."
+              : budgetPercent <= 100
+                ? "Getting close — but still within budget!"
+                : "Slightly over budget. Consider dropping the lowest-priority item."}
         </p>
       </section>
     </div>

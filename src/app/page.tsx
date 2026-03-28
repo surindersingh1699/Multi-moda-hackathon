@@ -15,11 +15,11 @@ type AppState = "idle" | "loading" | "error" | "results";
 const BUDGET_OPTIONS = [50, 100, 150] as const;
 
 const LOADING_STEPS = [
-  { text: "Scanning your room...", Icon: DoodleCamera },
-  { text: "Identifying style opportunities...", Icon: DoodleStar },
-  { text: "Finding budget-friendly items...", Icon: DoodleHeart },
-  { text: "Checking prices at Amazon, Target, IKEA...", Icon: DoodleLamp },
-  { text: "Building your style plan...", Icon: DoodleFrame },
+  { text: "Hmm, let me take a good look at your room...", Icon: DoodleCamera },
+  { text: "Ooh, I see some styling potential here!", Icon: DoodleStar },
+  { text: "Hunting for the perfect budget finds...", Icon: DoodleHeart },
+  { text: "Cross-checking prices across stores...", Icon: DoodleLamp },
+  { text: "Putting your makeover plan together!", Icon: DoodleFrame },
 ];
 
 const VIBE_OPTIONS = [
@@ -167,6 +167,13 @@ export default function Home() {
   };
 
 
+  // Dynamic page title
+  useEffect(() => {
+    document.title = appState === "results"
+      ? "My Room Makeover — Roomify"
+      : "Roomify — AI Bedroom Stylist";
+  }, [appState]);
+
   // Scroll to results when they appear
   useEffect(() => {
     if (appState === "results" && resultsRef.current) {
@@ -276,6 +283,24 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative">
+      {/* ── Sticky Header ── */}
+      <header className="sticky top-0 z-50 backdrop-blur-md border-b border-accent-100/50 h-12 flex items-center px-4 sm:px-6" style={{ backgroundColor: 'rgba(253, 248, 244, 0.85)' }}>
+        <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <DoodleBear className="w-6 h-6" />
+            <span
+              className="text-base font-bold bg-clip-text text-transparent"
+              style={{ backgroundImage: 'linear-gradient(to right, #E8753A, #D4877A, #B84E20)' }}
+            >
+              Roomify
+            </span>
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-txt-muted border border-accent-200 rounded-full px-2.5 py-0.5 bg-bg-card/50">
+            Hackathon 2026
+          </span>
+        </div>
+      </header>
+
       {/* ── Main Content ── */}
       <main className={`relative z-10 mx-auto px-4 py-8 sm:py-12 space-y-8 ${appState === "results" ? "max-w-5xl" : "max-w-2xl"}`}>
         {/* Upload / Idle State */}
@@ -303,8 +328,11 @@ export default function Home() {
                       Roomify
                     </span>
                   </h2>
-                  <p className="text-base sm:text-lg text-txt-secondary max-w-md mx-auto leading-relaxed">
-                    Your dream bedroom, styled by AI,<br />on a real budget.
+                  <p className="text-base sm:text-lg font-medium text-txt-primary max-w-md mx-auto leading-relaxed">
+                    Snap your bedroom. Get a designer<br />makeover plan in 30 seconds.
+                  </p>
+                  <p className="text-sm text-txt-secondary max-w-sm mx-auto">
+                    Real products. Real prices. Real links.<br />All under your budget.
                   </p>
                 </div>
 
@@ -315,9 +343,9 @@ export default function Home() {
                   </p>
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { icon: <DoodleCamera className="w-6 h-6" />, label: "Upload a photo", step: "1" },
-                      { icon: <DoodleStar className="w-6 h-6" />, label: "AI styles it", step: "2" },
-                      { icon: <DoodleHeart className="w-6 h-6" />, label: "Shop the look", step: "3" },
+                      { icon: <DoodleCamera className="w-6 h-6" />, label: "Snap your room", step: "1" },
+                      { icon: <DoodleStar className="w-6 h-6" />, label: "AI designs it", step: "2" },
+                      { icon: <DoodleHeart className="w-6 h-6" />, label: "Buy the look", step: "3" },
                     ].map(({ icon, label, step }) => (
                       <div key={step} className="flex flex-col items-center gap-1.5">
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-50 border border-accent-100">
@@ -330,6 +358,7 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+
               </div>
             )}
 
@@ -344,14 +373,14 @@ export default function Home() {
                 {/* Style prompt */}
                 <div>
                   <label htmlFor="style-prompt" className="block text-xs font-semibold text-txt-muted uppercase tracking-wider mb-1.5">
-                    Describe your vibe (optional)
+                    What vibe are you going for? (optional)
                   </label>
                   <input
                     id="style-prompt"
                     type="text"
                     value={userPrompt}
                     onChange={(e) => setUserPrompt(e.target.value)}
-                    placeholder="cozy and warm, minimalist, boho, dark academia..."
+                    placeholder='e.g., "warm and cozy" or "modern minimalist"'
                     className="w-full rounded-xl border border-accent-200 bg-bg-card px-4 py-3 text-sm text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all"
                   />
                 </div>
@@ -359,7 +388,7 @@ export default function Home() {
                 {/* Budget selector */}
                 <div>
                   <label className="block text-xs font-semibold text-txt-muted uppercase tracking-wider mb-1.5">
-                    Budget
+                    What&apos;s your budget?
                   </label>
                   <div className="flex gap-2">
                     {BUDGET_OPTIONS.map((opt) => (
@@ -394,7 +423,7 @@ export default function Home() {
                     <svg className="w-4 h-4 transition-transform group-hover:rotate-12" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
                     </svg>
-                    Style My Room
+                    Design My Makeover
                   </span>
                 </button>
               </div>
@@ -449,7 +478,7 @@ export default function Home() {
               onClick={() => analyze()}
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-err-100 px-4 py-2 text-sm font-medium text-err-700 transition-colors hover:bg-err-500 hover:text-white"
             >
-              Try again
+              Give it another shot
             </button>
           </div>
         )}
@@ -457,13 +486,16 @@ export default function Home() {
         {/* Results State */}
         {appState === "results" && result && (
           <div ref={resultsRef} className="space-y-6 animate-fadeIn">
-            {/* Happy bear header */}
-            <div className="flex items-center justify-center gap-3">
-              <DoodleBearHappy className="w-12 h-12" />
-              <p className="text-sm font-medium text-accent-500">
-                Here&apos;s your room makeover plan!
+            {/* Celebratory results header */}
+            <div className="text-center space-y-2">
+              <DoodleBearHappy className="w-16 h-16 mx-auto" />
+              <h2 className="text-2xl sm:text-3xl font-bold text-txt-primary flex items-center justify-center gap-2">
+                Your Makeover Plan is Ready!
+                <DoodleStar className="w-5 h-5 animate-twinkle" />
+              </h2>
+              <p className="text-sm text-txt-secondary max-w-sm mx-auto">
+                We found {result.items?.length ?? 0} items to transform your room — all for under ${result.total_estimated_cost ?? 0}.
               </p>
-              <DoodleStar className="w-5 h-5 animate-twinkle" />
             </div>
 
             {/* Try a Different Vibe — Quick Reroll */}
@@ -472,7 +504,7 @@ export default function Home() {
               style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
             >
               <p className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-3 text-center">
-                Try a Different Vibe
+                Want a different look?
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {VIBE_OPTIONS.map((vibe) => (
@@ -512,13 +544,13 @@ export default function Home() {
                 style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
               >
                 <p className="text-xs font-medium text-txt-secondary">
-                  Creating your styled room preview...
+                  Generating your before &amp; after preview...
                 </p>
                 <div className="w-40 h-1.5 rounded-full overflow-hidden mt-2.5 mx-auto">
                   <div className="h-full w-full animate-shimmer rounded-full" />
                 </div>
                 <p className="text-[10px] text-txt-muted mt-2">
-                  This takes 15-30 seconds
+                  Almost there — this takes about 20 seconds
                 </p>
               </div>
             )}
@@ -529,7 +561,7 @@ export default function Home() {
                 style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
               >
                 <p className="text-xs font-medium text-accent-600">
-                  Styled preview unavailable — but your shopping list is ready below!
+                  Preview image didn&apos;t load this time — but your full makeover plan is ready below!
                 </p>
               </div>
             )}
@@ -549,12 +581,29 @@ export default function Home() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                Analyze Another Room
+                Try Another Room
               </span>
             </button>
           </div>
         )}
       </main>
+
+      {/* ── Footer ── */}
+      <footer className="relative z-10 border-t border-accent-100/50 mt-12 pt-8 pb-6 text-center space-y-3">
+        <div className="flex items-center justify-center gap-2">
+          <DoodleBear className="w-5 h-5" />
+          <p className="text-xs text-txt-muted">
+            Made with love at <span className="font-semibold text-txt-secondary">Hackathon 2026</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-1 text-[10px] text-txt-muted">
+          {["GPT-4o", "DALL-E 3", "Gemini", "Next.js 16", "Tailwind 4", "SerpAPI"].map((tech, i) => (
+            <span key={tech}>
+              {tech}{i < 5 && <span className="mx-1 text-accent-200">·</span>}
+            </span>
+          ))}
+        </div>
+      </footer>
     </div>
   );
 }

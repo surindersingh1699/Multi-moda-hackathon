@@ -96,7 +96,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
             {/* Change photo label */}
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <span className="rounded-lg bg-white/90 backdrop-blur-sm px-4 py-2 text-xs font-semibold text-txt-primary shadow-sm">
-                Click to change photo
+                Tap to swap photo
               </span>
             </div>
           </div>
@@ -108,9 +108,9 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
               <DoodleStar className="w-4 h-4 absolute -top-1 -right-2 animate-twinkle" />
             </div>
             <p className="text-sm font-medium text-txt-secondary">
-              Drop a bedroom photo here or{" "}
+              Drop your bedroom photo here or{" "}
               <span className="text-accent-500 font-semibold underline decoration-accent-200 underline-offset-2 decoration-2">
-                browse
+                choose a file
               </span>
             </p>
             <p className="text-xs text-txt-muted mt-2">
