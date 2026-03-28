@@ -108,6 +108,12 @@ body {
 .animate-scaleBounce { animation: scaleBounce 0.4s ease-out both; }
 .animate-fillBar { animation: fillBar 1s ease-out both; }
 
+@keyframes fadeSwap {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeSwap { animation: fadeSwap 0.35s ease-out both; }
+
 /* Stagger delays */
 .stagger-1 { animation-delay: 0.1s; }
 .stagger-2 { animation-delay: 0.2s; }

@@ -1,15 +1,32 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import confetti from "canvas-confetti";
 import ImageUpload from "@/components/ImageUpload";
 import ResultsDisplay from "@/components/ResultsDisplay";
-import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar } from "@/components/DoodleElements";
+import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCamera, DoodleLamp, DoodleHeart, DoodleFrame } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
 import type { StylingResult } from "@/lib/schema";
 
 type AppState = "idle" | "loading" | "error" | "results";
 
 const BUDGET_OPTIONS = [50, 100, 150] as const;
+
+const LOADING_STEPS = [
+  { text: "Scanning your room...", Icon: DoodleCamera },
+  { text: "Identifying style opportunities...", Icon: DoodleStar },
+  { text: "Finding budget-friendly items...", Icon: DoodleHeart },
+  { text: "Checking prices at Amazon, Target, IKEA...", Icon: DoodleLamp },
+  { text: "Building your style plan...", Icon: DoodleFrame },
+];
+
+const VIBE_OPTIONS = [
+  { label: "Cozy Hygge", prompt: "cozy hygge — warm textures, soft lighting, candles, knit blankets" },
+  { label: "Minimalist", prompt: "minimalist — clean lines, neutral tones, less is more" },
+  { label: "Boho Chic", prompt: "boho chic — eclectic patterns, macramé, earthy tones, layered textiles" },
+  { label: "Dark Academia", prompt: "dark academia — moody tones, vintage books, warm wood, brass accents" },
+  { label: "Cottagecore", prompt: "cottagecore — floral prints, natural materials, vintage charm, soft pastels" },
+] as const;
 
 export default function Home() {
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -20,6 +37,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [budget, setBudget] = useState<number>(150);
+  const [activeVibe, setActiveVibe] = useState<string | null>(null);
+  const [loadingStep, setLoadingStep] = useState(0);
 
   // Phase 2: styled room image state
   const [styledImageUrl, setStyledImageUrl] = useState<string | null>(null);
@@ -33,15 +52,18 @@ export default function Home() {
     setError(null);
     setStyledImageUrl(null);
     setImageGenFailed(false);
+    setActiveVibe(null);
     setAppState("idle");
   }, []);
 
-  const analyze = async () => {
+  const analyze = async (promptOverride?: string) => {
     if (!file) return;
     setAppState("loading");
     setError(null);
     setStyledImageUrl(null);
     setImageGenFailed(false);
+
+    const prompt = promptOverride ?? userPrompt.trim();
 
     try {
       const base64 = await fileToBase64(file);
@@ -50,7 +72,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image: base64,
-          userPrompt: userPrompt.trim() || undefined,
+          userPrompt: prompt || undefined,
           budget,
         }),
       });
@@ -106,12 +128,75 @@ export default function Home() {
     }
   };
 
-  // Scroll to results when they appear
+  // Scroll to results + confetti + chime when they appear
   useEffect(() => {
     if (appState === "results" && resultsRef.current) {
       resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      // Terracotta palette confetti burst from both sides
+      const colors = ["#E8753A", "#D4622D", "#B84E20", "#F49556", "#D4877A", "#B05E50"];
+      const end = Date.now() + 1500;
+
+      const frame = () => {
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.7 },
+          colors,
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.7 },
+          colors,
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      };
+      frame();
+
+      // Celebration chime via Web Audio API (no file needed)
+      try {
+        const ctx = new AudioContext();
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 major chord arpeggio
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.12);
+          osc.stop(ctx.currentTime + i * 0.12 + 0.5);
+        });
+      } catch {
+        // Audio not supported — silently skip
+      }
     }
   }, [appState]);
+
+  // Rotate loading step messages
+  useEffect(() => {
+    if (appState !== "loading") {
+      setLoadingStep(0);
+      return;
+    }
+    setLoadingStep(0);
+    const interval = setInterval(() => {
+      setLoadingStep((prev) =>
+        prev < LOADING_STEPS.length - 1 ? prev + 1 : prev
+      );
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [appState]);
+
+  const rerollWithVibe = (vibe: typeof VIBE_OPTIONS[number]) => {
+    setActiveVibe(vibe.label);
+    setUserPrompt(vibe.prompt);
+    analyze(vibe.prompt);
+  };
 
   const reset = () => {
     setFile(null);
@@ -121,6 +206,7 @@ export default function Home() {
     setStyledImageUrl(null);
     setImageGenFailed(false);
     setUserPrompt("");
+    setActiveVibe(null);
     setAppState("idle");
   };
 
@@ -228,7 +314,7 @@ export default function Home() {
 
                 {/* Analyze button */}
                 <button
-                  onClick={analyze}
+                  onClick={() => analyze()}
                   className="group w-full rounded-xl px-4 py-3.5 text-sm font-semibold text-txt-on-accent transition-all duration-300 active:scale-[0.98]"
                   style={{
                     background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)',
@@ -249,28 +335,37 @@ export default function Home() {
           </div>
         )}
 
-        {/* Loading State — Bear thinking */}
+        {/* Loading State — Progressive steps */}
         {appState === "loading" && (
           <div className="flex flex-col items-center gap-4 py-10 animate-fadeIn">
             <DoodleBearThinking className="w-32 h-32 animate-float" />
 
-            <div>
-              <p className="text-sm font-medium text-txt-secondary text-center">
-                Hmm, let me think
-                <span className="inline-flex ml-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent-400 mx-0.5" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0s' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent-400 mx-0.5" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0.2s' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent-400 mx-0.5" style={{ animation: 'dotPulse 1.4s ease-in-out infinite', animationDelay: '0.4s' }} />
-                </span>
-              </p>
-              <p className="text-xs text-txt-muted text-center mt-1">
-                Finding the best makeover ideas for your room
-              </p>
+            <div className="h-14 flex flex-col items-center justify-center">
+              <div key={loadingStep} className="flex items-center gap-2 animate-fadeSwap">
+                {(() => {
+                  const { Icon } = LOADING_STEPS[loadingStep];
+                  return <Icon className="w-5 h-5" />;
+                })()}
+                <p className="text-sm font-medium text-txt-secondary text-center">
+                  {LOADING_STEPS[loadingStep].text}
+                </p>
+              </div>
             </div>
 
-            <div className="w-48 h-1.5 rounded-full overflow-hidden mt-2">
-              <div className="h-full w-full animate-shimmer rounded-full" />
+            {/* Step progress bar */}
+            <div className="w-48 h-1.5 rounded-full overflow-hidden mt-2 bg-accent-100">
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${((loadingStep + 1) / LOADING_STEPS.length) * 100}%`,
+                  background: 'linear-gradient(90deg, #E8753A, #F49556)',
+                }}
+              />
             </div>
+
+            <p className="text-[10px] text-txt-muted">
+              Step {loadingStep + 1} of {LOADING_STEPS.length}
+            </p>
           </div>
         )}
 
@@ -284,7 +379,7 @@ export default function Home() {
             </div>
             <p className="text-sm font-medium text-err-700">{error}</p>
             <button
-              onClick={analyze}
+              onClick={() => analyze()}
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-err-100 px-4 py-2 text-sm font-medium text-err-700 transition-colors hover:bg-err-500 hover:text-white"
             >
               Try again
@@ -302,6 +397,36 @@ export default function Home() {
                 Here&apos;s your room makeover plan!
               </p>
               <DoodleStar className="w-5 h-5 animate-twinkle" />
+            </div>
+
+            {/* Try a Different Vibe — Quick Reroll */}
+            <div
+              className="rounded-2xl bg-bg-card border border-accent-100 p-5"
+              style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
+            >
+              <p className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-3 text-center">
+                Try a Different Vibe
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {VIBE_OPTIONS.map((vibe) => (
+                  <button
+                    key={vibe.label}
+                    onClick={() => rerollWithVibe(vibe)}
+                    className={`rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+                      activeVibe === vibe.label
+                        ? "text-txt-on-accent shadow-sm"
+                        : "bg-bg-secondary border border-accent-200 text-txt-secondary hover:border-accent-400 hover:bg-accent-50"
+                    }`}
+                    style={
+                      activeVibe === vibe.label
+                        ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }
+                        : undefined
+                    }
+                  >
+                    {vibe.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Before/After Slider — Phase 2 */}
