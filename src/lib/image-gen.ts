@@ -1,23 +1,22 @@
 import OpenAI from "openai";
 import { GoogleGenAI, RawReferenceImage } from "@google/genai";
-import Replicate from "replicate";
 
 export interface ImageGenResult {
   imageDataUrl: string;
-  provider: "imagen3" | "flux" | "gpt-image-1";
+  provider: "imagen3" | "gpt-image-1";
 }
 
 /**
- * Generate a styled room image using a 3-tier fallback chain:
- * Imagen 3 → Flux Kontext → gpt-image-1
+ * Generate a styled room image using a fallback chain:
+ * Imagen 3 (Vertex AI) → gpt-image-1
  */
 export async function generateStyledRoom(
   imageBuffer: Buffer,
   prompt: string,
   size: "1024x1024" | "1536x1024" | "1024x1536"
 ): Promise<ImageGenResult> {
-  // Try Imagen 3 first (Google GenAI)
-  if (process.env.GOOGLE_API_KEY) {
+  // Try Imagen 3 first (Vertex AI Express)
+  if (process.env.VERTEX_AI_KEY) {
     try {
       const result = await generateWithImagen3(imageBuffer, prompt);
       if (result) return result;
@@ -26,20 +25,10 @@ export async function generateStyledRoom(
     }
   }
 
-  // Try Flux Kontext (Replicate)
-  if (process.env.REPLICATE_API_TOKEN) {
-    try {
-      const result = await generateWithFlux(imageBuffer, prompt);
-      if (result) return result;
-    } catch (e) {
-      console.warn("Flux Kontext failed, trying next provider:", e);
-    }
-  }
-
   // Fall back to gpt-image-1 (OpenAI)
   if (!process.env.OPENAI_API_KEY) {
     throw new Error(
-      "No image generation provider available. Set GOOGLE_API_KEY, REPLICATE_API_TOKEN, or OPENAI_API_KEY."
+      "No image generation provider available. Set VERTEX_AI_KEY or OPENAI_API_KEY."
     );
   }
   return generateWithGptImage1(imageBuffer, prompt, size);
@@ -51,7 +40,7 @@ async function generateWithImagen3(
   imageBuffer: Buffer,
   prompt: string
 ): Promise<ImageGenResult | null> {
-  const genai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! });
+  const genai = new GoogleGenAI({ vertexai: true, apiKey: process.env.VERTEX_AI_KEY! });
 
   const base64Data = imageBuffer.toString("base64");
 
@@ -75,49 +64,6 @@ async function generateWithImagen3(
   return {
     imageDataUrl: `data:image/png;base64,${imageBytes}`,
     provider: "imagen3",
-  };
-}
-
-// ── Flux Kontext via Replicate ────────────────────────────────────
-
-async function generateWithFlux(
-  imageBuffer: Buffer,
-  prompt: string
-): Promise<ImageGenResult | null> {
-  const replicate = new Replicate({
-    auth: process.env.REPLICATE_API_TOKEN!,
-  });
-
-  const output = await replicate.run("black-forest-labs/flux-kontext-pro", {
-    input: {
-      prompt,
-      image: imageBuffer,
-      aspect_ratio: "match_input",
-    },
-  });
-
-  // Replicate returns FileOutput(s) — could be single or array
-  const fileOutput = Array.isArray(output) ? output[0] : output;
-  if (!fileOutput) return null;
-
-  // FileOutput is a ReadableStream with a .url() method
-  const url =
-    typeof fileOutput === "string"
-      ? fileOutput
-      : typeof fileOutput === "object" && "url" in fileOutput
-        ? (fileOutput as { url: () => string }).url()
-        : null;
-
-  if (!url) return null;
-
-  // Fetch the generated image and convert to data URL
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const buf = Buffer.from(await res.arrayBuffer());
-
-  return {
-    imageDataUrl: `data:image/png;base64,${buf.toString("base64")}`,
-    provider: "flux",
   };
 }
 
