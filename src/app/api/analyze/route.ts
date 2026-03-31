@@ -5,6 +5,9 @@ import { buildPromptWithPreferences } from "@/lib/prompt";
 import { RESPONSE_FORMAT } from "@/lib/schema";
 import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
+import { createClient } from "@/lib/supabase/server";
+
+const MAX_USES = 5;
 
 const MAX_PAYLOAD_BYTES = 6 * 1024 * 1024; // 6MB (covers ~4MB image as base64)
 
@@ -34,6 +37,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Auth check
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Please sign in to analyze your room" },
+        { status: 401 }
+      );
+    }
+
+    // Usage limit check
+    const { count } = await supabase
+      .from("usage")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if ((count ?? 0) >= MAX_USES) {
+      return NextResponse.json(
+        {
+          error:
+            "You've reached the maximum of 5 free uses. Join our waiting list for more!",
+        },
+        { status: 429 }
+      );
+    }
+
     const budgetNum =
       typeof budget === "number" && budget > 0 ? budget : 150;
 
@@ -59,6 +92,7 @@ export async function POST(req: NextRequest) {
 
     const validation = validateResult(result, budgetNum);
     if (validation.ok) {
+      await supabase.from("usage").insert({ user_id: user.id });
       return NextResponse.json(validation.data);
     }
 
@@ -76,6 +110,7 @@ export async function POST(req: NextRequest) {
 
     const retryValidation = validateResult(retryResult, budgetNum);
     if (retryValidation.ok) {
+      await supabase.from("usage").insert({ user_id: user.id });
       return NextResponse.json(retryValidation.data);
     }
 
