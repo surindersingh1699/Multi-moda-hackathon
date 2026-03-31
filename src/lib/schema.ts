@@ -40,7 +40,89 @@ export interface ProductSearchResult {
   status: "complete" | "partial" | "failed";
 }
 
-/** OpenAI response_format JSON schema for strict structured output */
+// ── Step 1: Vision analysis intermediate type ─────────────────────
+
+export interface VisionAnalysis {
+  room_type: string;
+  room_reading: string;
+  style_direction: string;
+  identified_needs: string[];
+}
+
+// ── OpenAI structured output schemas ──────────────────────────────
+
+/** Step 1 response format — vision analysis */
+export const VISION_RESPONSE_FORMAT = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "vision_analysis",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        room_type: { type: "string" },
+        room_reading: { type: "string" },
+        style_direction: { type: "string" },
+        identified_needs: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+      required: [
+        "room_type",
+        "room_reading",
+        "style_direction",
+        "identified_needs",
+      ],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** Step 2 response format — product recommendations */
+export const RECOMMENDATION_RESPONSE_FORMAT = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "recommendations",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              category: { type: "string" },
+              estimated_price: { type: "number" },
+              priority: { type: "number" },
+              suggested_store: { type: "string" },
+              reason: { type: "string" },
+              search_query: { type: "string" },
+            },
+            required: [
+              "name",
+              "category",
+              "estimated_price",
+              "priority",
+              "suggested_store",
+              "reason",
+              "search_query",
+            ],
+            additionalProperties: false,
+          },
+        },
+        buy_order: { type: "array", items: { type: "string" } },
+        total_estimated_cost: { type: "number" },
+      },
+      required: ["items", "buy_order", "total_estimated_cost"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** Legacy single-call schema — used by Gemini fallback + retry path */
 export const RESPONSE_FORMAT = {
   type: "json_schema" as const,
   json_schema: {
@@ -89,4 +171,46 @@ export const RESPONSE_FORMAT = {
       additionalProperties: false,
     },
   },
+};
+
+/** Gemini-compatible JSON Schema for responseJsonSchema config */
+export const GEMINI_RESPONSE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    room_reading: { type: "string" },
+    style_direction: { type: "string" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          category: { type: "string" },
+          estimated_price: { type: "number" },
+          priority: { type: "number" },
+          suggested_store: { type: "string" },
+          reason: { type: "string" },
+          search_query: { type: "string" },
+        },
+        required: [
+          "name",
+          "category",
+          "estimated_price",
+          "priority",
+          "suggested_store",
+          "reason",
+          "search_query",
+        ],
+      },
+    },
+    buy_order: { type: "array", items: { type: "string" } },
+    total_estimated_cost: { type: "number" },
+  },
+  required: [
+    "room_reading",
+    "style_direction",
+    "items",
+    "buy_order",
+    "total_estimated_cost",
+  ],
 };

@@ -1,7 +1,9 @@
-import { StylingResult, StylingItem } from "./schema";
+import { StylingResult, StylingItem, VisionAnalysis } from "./schema";
 
 type ValidationOk = { ok: true; data: StylingResult };
 type ValidationErr = { ok: false; error: string };
+type VisionOk = { ok: true; data: VisionAnalysis };
+type VisionErr = { ok: false; error: string };
 
 /** Strict validation used server-side (rejects invalid responses). */
 export function validateResult(
@@ -32,6 +34,20 @@ export function validateResult(
     return {
       ok: false,
       error: `Total cost $${r.total_estimated_cost} exceeds $${budget} budget`,
+    };
+  }
+
+  // Validate sum of individual prices matches declared total (within 10%)
+  const sumOfPrices = (r.items as StylingItem[]).reduce(
+    (sum, item) => sum + (item.estimated_price ?? 0),
+    0
+  );
+  const totalCost = r.total_estimated_cost as number;
+  const tolerance = Math.max(totalCost * 0.1, 1);
+  if (Math.abs(sumOfPrices - totalCost) > tolerance) {
+    return {
+      ok: false,
+      error: `Price sum $${sumOfPrices.toFixed(2)} doesn't match total $${totalCost} (tolerance: 10%)`,
     };
   }
 
@@ -135,4 +151,27 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
   };
 
   return { ok: true, data: result };
+}
+
+/** Validate Step 1 vision analysis output */
+export function validateVisionAnalysis(
+  data: unknown
+): VisionOk | VisionErr {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return { ok: false, error: "Vision analysis is not a valid object" };
+  }
+  const r = data as Record<string, unknown>;
+  if (typeof r.room_type !== "string" || !r.room_type) {
+    return { ok: false, error: "Missing room_type" };
+  }
+  if (typeof r.room_reading !== "string" || !r.room_reading) {
+    return { ok: false, error: "Missing room_reading" };
+  }
+  if (typeof r.style_direction !== "string" || !r.style_direction) {
+    return { ok: false, error: "Missing style_direction" };
+  }
+  if (!Array.isArray(r.identified_needs) || r.identified_needs.length === 0) {
+    return { ok: false, error: "Missing or empty identified_needs" };
+  }
+  return { ok: true, data: data as VisionAnalysis };
 }
