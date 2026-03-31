@@ -4,9 +4,16 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import confetti from "canvas-confetti";
 import ImageUpload from "@/components/ImageUpload";
 import ResultsDisplay from "@/components/ResultsDisplay";
+import AuthModal from "@/components/AuthModal";
+import UsageBanner from "@/components/UsageBanner";
+import { useAuth } from "@/components/AuthProvider";
+import { createClient } from "@/lib/supabase/client";
 import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCamera, DoodleLamp, DoodleHeart, DoodleFrame, FloatingDoodles } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
+import { trackUploadPhoto, trackGenerateRoom } from "@/lib/analytics";
 import type { StylingResult, ProductMatch, ProductSearchResult } from "@/lib/schema";
+
+const MAX_USES = 5;
 
 
 
@@ -31,6 +38,10 @@ const VIBE_OPTIONS = [
 ] as const;
 
 export default function Home() {
+  const { user, loading: authLoading, usageCount, refreshUsage } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const usageLimitReached = usageCount !== null && usageCount >= MAX_USES;
+
   const resultsRef = useRef<HTMLDivElement>(null);
   const [appState, setAppState] = useState<AppState>("idle");
   const [file, setFile] = useState<File | null>(null);
@@ -66,10 +77,26 @@ export default function Home() {
     setApiDone(false);
     pendingResultRef.current = null;
     setAppState("idle");
+    trackUploadPhoto({
+      file_type: f.type,
+      file_size_kb: Math.round(f.size / 1024),
+    });
   }, []);
 
   const analyze = async (promptOverride?: string) => {
     if (!file) return;
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (usageLimitReached) return;
+
+    trackGenerateRoom({
+      budget,
+      vibe: activeVibe,
+      has_custom_prompt: (promptOverride ?? userPrompt.trim()).length > 0,
+    });
+
     setAppState("loading");
     setLoadingStep(0);
     setApiDone(false);
@@ -107,6 +134,7 @@ export default function Home() {
       // Product search fires post-reveal in parallel with styled image
       pendingResultRef.current = { data: parsed.data, base64 };
       setApiDone(true);
+      refreshUsage();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setAppState("error");
@@ -295,9 +323,32 @@ export default function Home() {
               Roomify
             </span>
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-txt-muted border border-accent-200 rounded-full px-2.5 py-0.5 bg-bg-card/50">
-            Hackathon 2026
-          </span>
+          <div className="flex items-center gap-2">
+            {user && usageCount !== null && (
+              <span className="text-[10px] font-medium text-txt-muted">
+                {usageCount}/{MAX_USES} uses
+              </span>
+            )}
+            {authLoading ? null : user ? (
+              <button
+                onClick={async () => {
+                  const supabase = createClient();
+                  await supabase.auth.signOut();
+                }}
+                className="text-[10px] font-semibold uppercase tracking-wider text-txt-muted border border-accent-200 rounded-full px-2.5 py-0.5 bg-bg-card/50 hover:bg-accent-50 transition-colors"
+              >
+                Sign Out
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="text-[10px] font-semibold uppercase tracking-wider text-txt-on-accent rounded-full px-2.5 py-0.5 transition-colors"
+                style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D)' }}
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -362,13 +413,36 @@ export default function Home() {
               </div>
             )}
 
-            <ImageUpload
-              onImageSelected={onImageSelected}
-              disabled={appState === "loading"}
-            />
+            {/* Usage limit banner */}
+            {usageLimitReached && <UsageBanner />}
+
+            {/* Sign-in prompt for anonymous users */}
+            {!user && !authLoading && !usageLimitReached && (
+              <div
+                className="rounded-2xl border border-accent-100 bg-bg-card p-4 text-center animate-fadeIn"
+                style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
+              >
+                <p className="text-xs text-txt-secondary">
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="font-semibold text-accent-500 hover:underline"
+                  >
+                    Sign in
+                  </button>{" "}
+                  to get 5 free room makeovers
+                </p>
+              </div>
+            )}
+
+            {!usageLimitReached && (
+              <ImageUpload
+                onImageSelected={onImageSelected}
+                disabled={appState === "loading"}
+              />
+            )}
 
             {/* Style preferences — shown after image selected */}
-            {file && appState !== "loading" && (
+            {file && appState !== "loading" && !usageLimitReached && (
               <div className="mt-5 space-y-4">
                 {/* Style prompt */}
                 <div>
@@ -604,6 +678,10 @@ export default function Home() {
           ))}
         </div>
       </footer>
+
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
     </div>
   );
 }
