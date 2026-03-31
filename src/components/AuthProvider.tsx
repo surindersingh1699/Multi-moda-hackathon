@@ -4,10 +4,16 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 import { createClient } from "@/lib/supabase/client";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   usageCount: number | null;
+  isAdmin: boolean;
   refreshUsage: () => Promise<void>;
 }
 
@@ -15,6 +21,7 @@ const AuthCtx = createContext<AuthContextValue>({
   user: null,
   loading: true,
   usageCount: null,
+  isAdmin: false,
   refreshUsage: async () => {},
 });
 
@@ -35,8 +42,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     []
   );
 
+  const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
+
   const refreshUsage = useCallback(async () => {
-    if (!user || !supabase) {
+    if (!user || !supabase || isAdmin) {
       setUsageCount(null);
       return;
     }
@@ -45,7 +54,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id);
     setUsageCount(count ?? 0);
-  }, [user, supabase]);
+  }, [user, supabase, isAdmin]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -69,7 +78,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, [refreshUsage]);
 
   return (
-    <AuthCtx.Provider value={{ user, loading, usageCount, refreshUsage }}>
+    <AuthCtx.Provider value={{ user, loading, usageCount, isAdmin, refreshUsage }}>
       {children}
     </AuthCtx.Provider>
   );

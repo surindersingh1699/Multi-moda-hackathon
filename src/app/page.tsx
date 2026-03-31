@@ -39,9 +39,9 @@ const VIBE_OPTIONS = [
 ] as const;
 
 export default function Home() {
-  const { user, loading: authLoading, usageCount, refreshUsage } = useAuth();
+  const { user, loading: authLoading, usageCount, isAdmin, refreshUsage } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const usageLimitReached = usageCount !== null && usageCount >= MAX_USES;
+  const usageLimitReached = !isAdmin && usageCount !== null && usageCount >= MAX_USES;
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const [appState, setAppState] = useState<AppState>("idle");
