@@ -16,9 +16,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { imageBase64, styleDirection, items } = (await req.json()) as {
+    const { imageBase64, items } = (await req.json()) as {
       imageBase64: string;
-      styleDirection: string;
       items: ItemInput[];
     };
 
@@ -54,25 +53,8 @@ ${items.some((i) => i.category.toLowerCase().includes("light")) ? "You may subtl
 
 That is ALL. No other changes whatsoever. The output photo should look nearly identical to the input with just these small additions visible.`;
 
-    // Try gpt-image-1 edit (can take input image) first
-    try {
-      const styledImageUrl = await generateWithImageEdit(openai, imageBase64, editPrompt);
-      return NextResponse.json({ styledImageUrl });
-    } catch (editError) {
-      console.warn("gpt-image-1 edit failed, trying dall-e-3 fallback:", editError);
-    }
-
-    // Fallback: dall-e-3 text-only generation
-    try {
-      const styledImageUrl = await generateWithDallE3(openai, editPrompt, styleDirection);
-      return NextResponse.json({ styledImageUrl });
-    } catch (dalleError) {
-      console.error("dall-e-3 fallback also failed:", dalleError);
-      return NextResponse.json(
-        { error: "Image generation failed" },
-        { status: 500 }
-      );
-    }
+    const styledImageUrl = await generateWithImageEdit(openai, imageBase64, editPrompt);
+    return NextResponse.json({ styledImageUrl });
   } catch (e) {
     console.error("Generate styled room error:", e);
     return NextResponse.json(
@@ -80,6 +62,35 @@ That is ALL. No other changes whatsoever. The output photo should look nearly id
       { status: 500 }
     );
   }
+}
+
+function getImageDimensions(buf: Buffer): { width: number; height: number } | null {
+  // PNG: IHDR chunk starts at byte 8, width at 16, height at 20
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  // JPEG: scan for SOF0 (0xFFC0) or SOF2 (0xFFC2) marker
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let offset = 2;
+    while (offset < buf.length - 9) {
+      if (buf[offset] !== 0xff) break;
+      const marker = buf[offset + 1];
+      if (marker === 0xc0 || marker === 0xc2) {
+        return { height: buf.readUInt16BE(offset + 5), width: buf.readUInt16BE(offset + 7) };
+      }
+      offset += 2 + buf.readUInt16BE(offset + 2);
+    }
+  }
+  return null;
+}
+
+function pickSize(buf: Buffer): "1024x1024" | "1536x1024" | "1024x1536" {
+  const dims = getImageDimensions(buf);
+  if (!dims) return "1024x1024";
+  const { width, height } = dims;
+  if (width > height * 1.2) return "1536x1024"; // landscape
+  if (height > width * 1.2) return "1024x1536"; // portrait
+  return "1024x1024"; // square-ish
 }
 
 async function generateWithImageEdit(
@@ -91,6 +102,8 @@ async function generateWithImageEdit(
   const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
   const imageBuffer = Buffer.from(base64Data, "base64");
 
+  const size = pickSize(imageBuffer);
+
   // Convert to a File-like object for the API
   const imageFile = new File([imageBuffer], "room.png", { type: "image/png" });
 
@@ -98,7 +111,7 @@ async function generateWithImageEdit(
     model: "gpt-image-1",
     image: imageFile,
     prompt,
-    size: "1024x1024",
+    size,
   });
 
   // gpt-image-1 returns b64_json by default
@@ -115,27 +128,3 @@ async function generateWithImageEdit(
   throw new Error("No image data in response");
 }
 
-async function generateWithDallE3(
-  openai: OpenAI,
-  editPrompt: string,
-  styleDirection: string
-): Promise<string> {
-  // dall-e-3 can't take an input image, so we describe the room
-  const textPrompt = `Professional interior design "after" photo of a cozy bedroom makeover. ${editPrompt}. Style: ${styleDirection}. Photorealistic, warm natural lighting, shot on a high-end camera, interior design magazine quality.`;
-
-  const response = await openai.images.generate({
-    model: "dall-e-3",
-    prompt: textPrompt.slice(0, 4000), // dall-e-3 prompt limit
-    n: 1,
-    size: "1792x1024",
-    quality: "standard",
-    response_format: "b64_json",
-  });
-
-  const b64 = response.data?.[0]?.b64_json;
-  if (!b64) {
-    throw new Error("No image data in dall-e-3 response");
-  }
-
-  return `data:image/png;base64,${b64}`;
-}

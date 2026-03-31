@@ -2,11 +2,17 @@
 
 import { useRef, useCallback, useState } from "react";
 import Image from "next/image";
+// Dynamically imported to avoid SSR "window is not defined" error
+const convertHeic = async (blob: Blob) => {
+  const heic2any = (await import("heic2any")).default;
+  return heic2any({ blob, toType: "image/jpeg", quality: 0.9 });
+};
 import { DoodleCamera, DoodleStar } from "@/components/DoodleElements";
 
 const MAX_SIZE_MB = 4;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const HEIC_TYPES = ["image/heic", "image/heif"];
 
 interface Props {
   onImageSelected: (file: File, previewUrl: string) => void;
@@ -18,16 +24,17 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [converting, setConverting] = useState(false);
 
-  const handleFile = useCallback(
+  const isHeic = (file: File): boolean => {
+    if (HEIC_TYPES.includes(file.type)) return true;
+    // Some browsers report empty type for HEIC — check extension
+    const ext = file.name.toLowerCase().split(".").pop();
+    return ext === "heic" || ext === "heif";
+  };
+
+  const processFile = useCallback(
     (file: File) => {
-      setError(null);
-
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        setError("Please upload a JPG, PNG, or WebP image.");
-        return;
-      }
-
       if (file.size > MAX_SIZE_BYTES) {
         setError(`Image must be under ${MAX_SIZE_MB}MB.`);
         return;
@@ -44,6 +51,35 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
       onImageSelected(file, url);
     },
     [onImageSelected]
+  );
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setError(null);
+
+      if (isHeic(file)) {
+        setConverting(true);
+        try {
+          const blob = await convertHeic(file);
+          const jpegBlob = Array.isArray(blob) ? blob[0] : blob;
+          const converted = new File([jpegBlob], file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"), { type: "image/jpeg" });
+          processFile(converted);
+        } catch {
+          setError("Could not convert HEIC image. Try converting to JPG first.");
+        } finally {
+          setConverting(false);
+        }
+        return;
+      }
+
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        setError("Please upload a JPG, PNG, WebP, or HEIC image.");
+        return;
+      }
+
+      processFile(file);
+    },
+    [processFile]
   );
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +117,12 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
         `}
         style={dragOver ? { boxShadow: '0 0 20px rgba(232, 117, 58, 0.3)' } : {}}
       >
-        {preview ? (
+        {converting ? (
+          <div className="flex flex-col items-center gap-2 py-4">
+            <div className="w-6 h-6 border-2 border-accent-300 border-t-accent-500 rounded-full animate-spin" />
+            <p className="text-sm text-txt-secondary">Converting HEIC image...</p>
+          </div>
+        ) : preview ? (
           <div className="relative group w-full">
             <Image
               src={preview}
@@ -114,7 +155,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
               </span>
             </p>
             <p className="text-xs text-txt-muted mt-2">
-              JPG, PNG, or WebP up to {MAX_SIZE_MB}MB
+              JPG, PNG, WebP, or HEIC up to {MAX_SIZE_MB}MB
             </p>
           </>
         )}
@@ -122,7 +163,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
           onChange={onFileChange}
           className="hidden"
           disabled={disabled}
