@@ -2,10 +2,57 @@
 
 import { useRef, useCallback, useState } from "react";
 import Image from "next/image";
-// Dynamically imported to avoid SSR "window is not defined" error
-const convertHeic = async (blob: Blob) => {
+// Canvas-based conversion: works natively in Safari/iOS which support HEIC
+const convertViaCanvas = (blob: Blob): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new window.Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context unavailable"));
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+        "image/jpeg",
+        0.9
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Browser cannot decode this image"));
+    };
+    img.src = url;
+  });
+
+// Dynamically imported polyfill for browsers without native HEIC support
+const convertViaHeic2any = async (blob: Blob) => {
   const heic2any = (await import("heic2any")).default;
   return heic2any({ blob, toType: "image/jpeg", quality: 0.9 });
+};
+
+// Server-side conversion via sharp (most reliable)
+const convertViaServer = async (blob: Blob): Promise<Blob> => {
+  const res = await fetch("/api/convert-heic", { method: "POST", body: blob });
+  if (!res.ok) throw new Error("Server conversion failed");
+  return res.blob();
+};
+
+// Try native canvas first (Safari/iOS), then heic2any (Chrome), then server
+const convertHeic = async (blob: Blob): Promise<Blob> => {
+  try {
+    return await convertViaCanvas(blob);
+  } catch {
+    try {
+      const result = await convertViaHeic2any(blob);
+      return Array.isArray(result) ? result[0] : result;
+    } catch {
+      return convertViaServer(blob);
+    }
+  }
 };
 import { DoodleCamera, DoodleStar } from "@/components/DoodleElements";
 
@@ -60,12 +107,13 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
       if (isHeic(file)) {
         setConverting(true);
         try {
-          const blob = await convertHeic(file);
-          const jpegBlob = Array.isArray(blob) ? blob[0] : blob;
+          const jpegBlob = await convertHeic(file);
           const converted = new File([jpegBlob], file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"), { type: "image/jpeg" });
           processFile(converted);
         } catch {
-          setError("Could not convert HEIC image. Try converting to JPG first.");
+          // Client-side conversion failed — pass HEIC through as-is.
+          // Server will convert it with sharp before sending to vision API.
+          processFile(file);
         } finally {
           setConverting(false);
         }

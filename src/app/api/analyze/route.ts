@@ -8,6 +8,7 @@ import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_USES = 5;
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").filter(Boolean);
 
 const MAX_PAYLOAD_BYTES = 6 * 1024 * 1024; // 6MB (covers ~4MB image as base64)
 
@@ -51,20 +52,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Usage limit check
-    const { count } = await supabase
-      .from("usage")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id);
+    // Usage limit check (admins bypass)
+    const isAdmin = ADMIN_EMAILS.includes(user.email ?? "");
+    if (!isAdmin) {
+      const { count } = await supabase
+        .from("usage")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
 
-    if ((count ?? 0) >= MAX_USES) {
-      return NextResponse.json(
-        {
-          error:
-            "You've reached the maximum of 5 free uses. Join our waiting list for more!",
-        },
-        { status: 429 }
-      );
+      if ((count ?? 0) >= MAX_USES) {
+        return NextResponse.json(
+          {
+            error:
+              "You've reached the maximum of 5 free uses. Join our waiting list for more!",
+          },
+          { status: 429 }
+        );
+      }
     }
 
     const budgetNum =

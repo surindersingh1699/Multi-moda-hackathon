@@ -4,7 +4,7 @@
 - Always follow Plan → Build → Verify
 - Never implement multiple features at once
 - Keep scope minimal
-- Optimize for working demo, not perfection
+- Prioritize production quality, reliability, and user experience
 
 ---
 

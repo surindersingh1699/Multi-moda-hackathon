@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:secrets": "infisical run --env=dev -- next dev",
     "build": "next build",
+    "build:secrets": "infisical run --env=prod -- next build",
     "start": "next start",
     "lint": "eslint"
   },
