@@ -44,16 +44,18 @@ export async function POST(req: NextRequest) {
       .join("\n");
 
     // Positive-framing prompt — works better with all image gen models
-    const editPrompt = `This is a real room photo. Keep everything exactly as it is — same walls, floor, furniture, layout, perspective, and lighting.
+    const editPrompt = `This is a real room photo. Keep everything exactly as it is — same walls, floor, furniture, layout, perspective, and structure.
 
-Your only task: naturally add these specific small items into the existing room at the exact locations specified:
+Your task: naturally add these specific small items into the existing room at the exact locations specified:
 ${itemList}
 
 Each item has a specific placement — follow it precisely. The items should look naturally integrated, matching the room's existing scale and perspective.
 
-${items.some((i) => i.category.toLowerCase().includes("light")) ? "Since lighting items are included, you may subtly warm the overall lighting tone." : "Keep the existing lighting and color tone exactly as-is."}
+${items.some((i) => i.category.toLowerCase().includes("light")) ? "Since lighting items are included, warm the overall lighting tone to a cozy golden-hour feel." : "Subtly warm the lighting tone — shift toward a soft golden-hour warmth as if late afternoon sunlight is filling the room."}
 
-The result should look like a real photo of the same room with just these small additions visible. Everything else stays identical.`;
+Cinematic polish: Apply the kind of subtle elevation an interior design photographer would use — slightly richer tones, gentle depth of field with the new items in crisp focus, and a clean inviting ambiance. The room should feel aspirational and magazine-worthy, like a professional "after" photo from a room makeover.
+
+Do NOT change the room layout, wall colors, existing furniture, or perspective. Only enhance mood, light, and atmosphere. The result should look like the same real room, beautifully photographed, with the new items naturally in place.`;
 
     const size = pickSize(optimizedBuffer);
 

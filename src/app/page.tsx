@@ -758,15 +758,21 @@ export default function Home() {
 /* ── Before/After Slider (inline for now, Phase 2) ── */
 function BeforeAfterSlider({ beforeSrc, afterSrc }: { beforeSrc: string; afterSrc: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState(50);
+  const beforeRef = useRef<HTMLImageElement>(null);
+  const lineRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+
+  const updatePosition = useCallback((pct: number) => {
+    const clamped = Math.max(2, Math.min(98, pct));
+    if (beforeRef.current) beforeRef.current.style.clipPath = `inset(0 ${100 - clamped}% 0 0)`;
+    if (lineRef.current) lineRef.current.style.left = `${clamped}%`;
+  }, []);
 
   const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = ((clientX - rect.left) / rect.width) * 100;
-    setPosition(Math.max(2, Math.min(98, x)));
-  }, []);
+    updatePosition(((clientX - rect.left) / rect.width) * 100);
+  }, [updatePosition]);
 
   return (
     <div className="space-y-2">
@@ -778,7 +784,7 @@ function BeforeAfterSlider({ beforeSrc, afterSrc }: { beforeSrc: string; afterSr
       <div
         ref={containerRef}
         className="relative w-full rounded-2xl overflow-hidden border border-accent-100 cursor-col-resize select-none"
-        style={{ aspectRatio: "16/10", boxShadow: '0 2px 8px rgba(44,24,16,0.1)' }}
+        style={{ aspectRatio: "16/10", boxShadow: '0 2px 8px rgba(44,24,16,0.1)', touchAction: 'none' }}
         onPointerDown={(e) => {
           isDragging.current = true;
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -789,24 +795,24 @@ function BeforeAfterSlider({ beforeSrc, afterSrc }: { beforeSrc: string; afterSr
         }}
         onPointerUp={() => { isDragging.current = false; }}
       >
-        {/* After image (full) */}
+        {/* After image (full, bottom layer) */}
         <img src={afterSrc} alt="Styled room" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
 
-        {/* Before image (clipped) */}
-        <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
-          <img
-            src={beforeSrc}
-            alt="Original room"
-            className="absolute inset-0 h-full object-cover"
-            style={{ width: `${containerRef.current?.offsetWidth ?? 9999}px`, maxWidth: 'none' }}
-            draggable={false}
-          />
-        </div>
+        {/* Before image (clipped via clip-path, GPU-composited) */}
+        <img
+          ref={beforeRef}
+          src={beforeSrc}
+          alt="Original room"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ clipPath: 'inset(0 50% 0 0)' }}
+          draggable={false}
+        />
 
         {/* Slider line */}
         <div
+          ref={lineRef}
           className="absolute top-0 bottom-0 w-0.5 bg-white z-10"
-          style={{ left: `${position}%`, boxShadow: '0 0 8px rgba(0,0,0,0.3)' }}
+          style={{ left: '50%', boxShadow: '0 0 8px rgba(0,0,0,0.3)' }}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white flex items-center justify-center"
             style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
