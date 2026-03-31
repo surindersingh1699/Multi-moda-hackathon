@@ -19,7 +19,7 @@ const MAX_USES = 5;
 
 type AppState = "idle" | "loading" | "error" | "results";
 
-const BUDGET_OPTIONS = [50, 100, 150] as const;
+const BUDGET_OPTIONS = [75, 150, 250] as const;
 
 const LOADING_STEPS = [
   { text: "Hmm, let me take a good look at your room...", Icon: DoodleCamera },
@@ -30,6 +30,7 @@ const LOADING_STEPS = [
 ];
 
 const VIBE_OPTIONS = [
+  { label: "Clean Upgrade", prompt: "elevate what's already here — fix what's missing, keep the existing style, just make it look polished and intentional" },
   { label: "Cozy Hygge", prompt: "cozy hygge — warm textures, soft lighting, candles, knit blankets" },
   { label: "Minimalist", prompt: "minimalist — clean lines, neutral tones, less is more" },
   { label: "Boho Chic", prompt: "boho chic — eclectic patterns, macramé, earthy tones, layered textiles" },
@@ -50,6 +51,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [userPrompt, setUserPrompt] = useState("");
   const [budget, setBudget] = useState<number>(150);
+  const [customBudget, setCustomBudget] = useState<string>("");
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
 
@@ -223,7 +225,7 @@ export default function Home() {
           items: analysisResult.items.map((i) => ({
             name: i.name,
             category: i.category,
-            reason: i.reason,
+            placement: i.placement,
           })),
         }),
       });
@@ -514,17 +516,38 @@ export default function Home() {
                     {BUDGET_OPTIONS.map((opt) => (
                       <button
                         key={opt}
-                        onClick={() => setBudget(opt)}
+                        onClick={() => { setBudget(opt); setCustomBudget(""); }}
                         className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                          budget === opt
+                          budget === opt && !customBudget
                             ? "text-txt-on-accent shadow-sm"
                             : "bg-bg-card border border-accent-200 text-txt-secondary hover:border-accent-400"
                         }`}
-                        style={budget === opt ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
+                        style={budget === opt && !customBudget ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
                       >
                         ${opt}
                       </button>
                     ))}
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-txt-muted pointer-events-none">$</span>
+                      <input
+                        type="number"
+                        min={25}
+                        max={500}
+                        placeholder="Custom"
+                        value={customBudget}
+                        onChange={(e) => {
+                          setCustomBudget(e.target.value);
+                          const val = parseInt(e.target.value, 10);
+                          if (val > 0) setBudget(val);
+                        }}
+                        className={`w-full rounded-xl pl-7 pr-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                          customBudget
+                            ? "text-txt-on-accent shadow-sm"
+                            : "bg-bg-card border border-accent-200 text-txt-secondary hover:border-accent-400"
+                        }`}
+                        style={customBudget ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
+                      />
+                    </div>
                   </div>
                 </div>
 

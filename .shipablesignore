@@ -1,0 +1,41 @@
+# Build artifacts & dependencies
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+
+# Project files not needed in skill package
+src/
+public/
+fixtures/
+.claude/
+.github/
+.git/
+
+# Config files
+package.json
+package-lock.json
+tsconfig.json
+next.config.ts
+next-env.d.ts
+postcss.config.mjs
+eslint.config.mjs
+
+# Docs & notes
+CLAUDE.md
+CLAUDE copy.md
+README.md
+MODEL_PROMPT.ms
+PROJECT_STATE.md
+claude_code_engineering_playbook.md
+top_100_design_websites.md
+spec.md
+
+# Binary assets
+*.png
+*.jpg
+*.glb

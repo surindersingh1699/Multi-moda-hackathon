@@ -20,14 +20,15 @@ export function validateResult(
     typeof r.room_reading !== "string" ||
     typeof r.style_direction !== "string" ||
     !Array.isArray(r.items) ||
-    !Array.isArray(r.buy_order) ||
+    !Array.isArray(r.quick_wins) ||
     typeof r.total_estimated_cost !== "number"
   ) {
     return { ok: false, error: "Missing required top-level fields" };
   }
 
-  if (r.items.length < 4 || r.items.length > 6) {
-    return { ok: false, error: `Expected 4-6 items, got ${r.items.length}` };
+  const minItems = budget <= 100 ? 3 : 4;
+  if (r.items.length < minItems || r.items.length > 6) {
+    return { ok: false, error: `Expected ${minItems}-6 items, got ${r.items.length}` };
   }
 
   if (r.total_estimated_cost > budget) {
@@ -68,6 +69,9 @@ export function validateResult(
     if (typeof it.search_query !== "string" || !it.search_query) {
       return { ok: false, error: `Missing search_query for ${it.name}` };
     }
+    if (typeof it.placement !== "string" || !it.placement) {
+      return { ok: false, error: `Missing placement for ${it.name}` };
+    }
   }
 
   return { ok: true, data: data as StylingResult };
@@ -90,8 +94,8 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
       ? r.style_direction
       : null;
   const rawItems = Array.isArray(r.items) ? r.items : null;
-  const buy_order = Array.isArray(r.buy_order)
-    ? r.buy_order.filter((s): s is string => typeof s === "string")
+  const quick_wins = Array.isArray(r.quick_wins)
+    ? r.quick_wins.filter((s): s is string => typeof s === "string")
     : [];
   const total_estimated_cost =
     typeof r.total_estimated_cost === "number" && isFinite(r.total_estimated_cost)
@@ -132,6 +136,10 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
         typeof it.search_query === "string" && it.search_query
           ? it.search_query
           : it.name,
+      placement:
+        typeof it.placement === "string" && it.placement
+          ? it.placement
+          : "In the room where it fits best",
     };
 
     items.push(parsed);
@@ -145,7 +153,9 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
     room_reading,
     style_direction,
     items,
-    buy_order: buy_order.length > 0 ? buy_order : items.map((i) => i.name),
+    quick_wins: quick_wins.length > 0
+      ? quick_wins
+      : items.slice(0, 2).map((i) => i.name),
     total_estimated_cost:
       total_estimated_cost ?? items.reduce((s, i) => s + i.estimated_price, 0),
   };
@@ -169,6 +179,15 @@ export function validateVisionAnalysis(
   }
   if (typeof r.style_direction !== "string" || !r.style_direction) {
     return { ok: false, error: "Missing style_direction" };
+  }
+  if (typeof r.existing_color_palette !== "string" || !r.existing_color_palette) {
+    return { ok: false, error: "Missing existing_color_palette" };
+  }
+  if (typeof r.lighting_assessment !== "string" || !r.lighting_assessment) {
+    return { ok: false, error: "Missing lighting_assessment" };
+  }
+  if (typeof r.whats_working !== "string" || !r.whats_working) {
+    return { ok: false, error: "Missing whats_working" };
   }
   if (!Array.isArray(r.identified_needs) || r.identified_needs.length === 0) {
     return { ok: false, error: "Missing or empty identified_needs" };

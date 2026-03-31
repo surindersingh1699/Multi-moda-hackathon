@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
               room_reading: analysis.room_reading,
               style_direction: analysis.style_direction,
               items: recResult.items as StylingResult["items"],
-              buy_order: recResult.buy_order as string[],
+              quick_wins: recResult.quick_wins as string[],
               total_estimated_cost:
                 recResult.total_estimated_cost as number,
             };
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
           // Send recommendations event
           send("recommendations", {
             items: finalResult.items,
-            buy_order: finalResult.buy_order,
+            quick_wins: finalResult.quick_wins,
             total_estimated_cost: finalResult.total_estimated_cost,
           });
 
@@ -302,7 +302,7 @@ async function callOpenAIVision(
 ): Promise<unknown> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
-    max_tokens: 512,
+    max_tokens: 768,
     response_format: VISION_RESPONSE_FORMAT,
     messages: [
       { role: "system", content: systemPrompt },

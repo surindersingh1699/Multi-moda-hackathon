@@ -41,7 +41,7 @@
 - `src/lib/validate.ts` — server + client validators
 - `src/app/api/analyze/route.ts` — SSE streaming analysis
 - `src/app/api/generate-styled-room/route.ts` — image editing
-- `src/app/api/find-products/route.ts` — SerpAPI product search
+- `src/app/api/find-products/route.ts` — ScraperAPI Amazon product search
 
 ---
 

@@ -5,7 +5,7 @@ import { generateStyledRoom } from "@/lib/image-gen";
 interface ItemInput {
   name: string;
   category: string;
-  reason: string;
+  placement: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -39,17 +39,17 @@ export async function POST(req: NextRequest) {
     const itemList = items
       .map(
         (item, i) =>
-          `${i + 1}. ${item.name} (${item.category}) — ${item.reason}`
+          `${i + 1}. ${item.name} (${item.category}) — placed ${item.placement}`
       )
       .join("\n");
 
     // Positive-framing prompt — works better with all image gen models
     const editPrompt = `This is a real room photo. Keep everything exactly as it is — same walls, floor, furniture, layout, perspective, and lighting.
 
-Your only task: naturally add these specific small items into the existing room:
+Your only task: naturally add these specific small items into the existing room at the exact locations specified:
 ${itemList}
 
-Place each item where it would naturally belong (e.g., a blanket draped on the bed, a plant on a surface, lights along a wall or behind furniture).
+Each item has a specific placement — follow it precisely. The items should look naturally integrated, matching the room's existing scale and perspective.
 
 ${items.some((i) => i.category.toLowerCase().includes("light")) ? "Since lighting items are included, you may subtly warm the overall lighting tone." : "Keep the existing lighting and color tone exactly as-is."}
 

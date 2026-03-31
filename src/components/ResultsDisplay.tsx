@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { StylingResult, StylingItem, ProductMatch } from "@/lib/schema";
-import { DoodlePillow, DoodleLamp, DoodlePlant, DoodleHeart } from "@/components/DoodleElements";
+import { DoodlePillow, DoodleLamp, DoodlePlant, DoodleStar } from "@/components/DoodleElements";
 
 interface Props {
   result: StylingResult;
@@ -28,9 +28,9 @@ export default function ResultsDisplay({
     typeof result.total_estimated_cost === "number" && isFinite(result.total_estimated_cost)
       ? result.total_estimated_cost
       : items.reduce((s, i) => s + (i.estimated_price ?? 0), 0);
-  const buyOrder = Array.isArray(result.buy_order)
-    ? result.buy_order.filter((s): s is string => typeof s === "string")
-    : items.map((i) => i.name);
+  const quickWins = Array.isArray(result.quick_wins)
+    ? result.quick_wins.filter((s): s is string => typeof s === "string")
+    : items.slice(0, 2).map((i) => i.name);
 
   const budgetPercent = Math.min(100, Math.round((totalCost / budget) * 100));
 
@@ -111,6 +111,35 @@ export default function ResultsDisplay({
         </p>
       </section>
 
+      {/* ── Quick Wins — Start Here ── */}
+      {quickWins.length > 0 && (
+        <section
+          className="animate-slideUp stagger-3 rounded-2xl bg-bg-card border-2 border-dashed border-accent-300 p-5"
+          style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
+        >
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
+            <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
+            <DoodleStar className="w-4 h-4 inline-block" />
+            Quick Wins
+            <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
+          </h2>
+          <p className="text-[10px] text-txt-muted mb-3 text-center">On a tight budget? Start with these for the biggest impact</p>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {quickWins.map((name) => (
+              <span
+                key={name}
+                className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-accent-600 bg-accent-50 border border-accent-200"
+              >
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
+                </svg>
+                {name}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ── Recommended Items ── */}
       <section className="animate-slideUp stagger-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
@@ -184,35 +213,6 @@ export default function ResultsDisplay({
         </button>
       </div>
 
-      {/* ── Buy Order — Timeline ── */}
-      <section
-        className="animate-slideUp stagger-4 rounded-2xl bg-bg-card border border-accent-100 p-6"
-        style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
-      >
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-txt-muted mb-1 flex items-center gap-2">
-          <span className="h-px flex-1 bg-gradient-to-r from-accent-200 to-transparent" />
-          <DoodleHeart className="w-4 h-4 inline-block" />
-          Suggested Buy Order
-          <span className="h-px flex-1 bg-gradient-to-l from-accent-200 to-transparent" />
-        </h2>
-        <p className="text-[10px] text-txt-muted mb-4 text-center">Start with the highest-impact piece</p>
-        <ol className="space-y-0 relative">
-          {/* Vertical connecting line */}
-          <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-accent-300 to-accent-100" />
-
-          {buyOrder.map((name, i) => (
-            <li key={`${name}-${i}`} className="relative flex items-center gap-4 py-2">
-              <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 border-accent-300 bg-bg-card text-accent-600">
-                {i + 1}
-              </div>
-              <span className="text-sm text-txt-secondary font-medium">
-                {name}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
       {/* ── Budget Tracker — Animated Bar ── */}
       <section
         className="animate-slideUp stagger-5 rounded-2xl bg-bg-card border border-accent-100 p-6"
@@ -266,6 +266,7 @@ function ItemCard({
   const category = item.category || "item";
   const store = item.suggested_store || "Store";
   const searchQuery = item.search_query || name;
+  const placement = item.placement || "";
 
   return (
     <div
@@ -316,6 +317,17 @@ function ItemCard({
         <p className="mt-1.5 text-xs text-txt-muted leading-relaxed">
           {item.reason || "Recommended for your room."}
         </p>
+
+        {/* Placement hint */}
+        {placement && (
+          <p className="mt-1 text-[10px] text-txt-muted italic flex items-center gap-1">
+            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {placement}
+          </p>
+        )}
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <Tag label={category} />

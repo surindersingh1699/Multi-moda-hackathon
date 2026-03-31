@@ -6,13 +6,14 @@ export interface StylingItem {
   suggested_store: string;
   reason: string;
   search_query: string;
+  placement: string;
 }
 
 export interface StylingResult {
   room_reading: string;
   style_direction: string;
   items: StylingItem[];
-  buy_order: string[];
+  quick_wins: string[];
   total_estimated_cost: number;
 }
 
@@ -46,6 +47,9 @@ export interface VisionAnalysis {
   room_type: string;
   room_reading: string;
   style_direction: string;
+  existing_color_palette: string;
+  lighting_assessment: string;
+  whats_working: string;
   identified_needs: string[];
 }
 
@@ -63,6 +67,9 @@ export const VISION_RESPONSE_FORMAT = {
         room_type: { type: "string" },
         room_reading: { type: "string" },
         style_direction: { type: "string" },
+        existing_color_palette: { type: "string" },
+        lighting_assessment: { type: "string" },
+        whats_working: { type: "string" },
         identified_needs: {
           type: "array",
           items: { type: "string" },
@@ -72,6 +79,9 @@ export const VISION_RESPONSE_FORMAT = {
         "room_type",
         "room_reading",
         "style_direction",
+        "existing_color_palette",
+        "lighting_assessment",
+        "whats_working",
         "identified_needs",
       ],
       additionalProperties: false,
@@ -100,6 +110,7 @@ export const RECOMMENDATION_RESPONSE_FORMAT = {
               suggested_store: { type: "string" },
               reason: { type: "string" },
               search_query: { type: "string" },
+              placement: { type: "string" },
             },
             required: [
               "name",
@@ -109,14 +120,15 @@ export const RECOMMENDATION_RESPONSE_FORMAT = {
               "suggested_store",
               "reason",
               "search_query",
+              "placement",
             ],
             additionalProperties: false,
           },
         },
-        buy_order: { type: "array", items: { type: "string" } },
+        quick_wins: { type: "array", items: { type: "string" } },
         total_estimated_cost: { type: "number" },
       },
-      required: ["items", "buy_order", "total_estimated_cost"],
+      required: ["items", "quick_wins", "total_estimated_cost"],
       additionalProperties: false,
     },
   },
@@ -145,6 +157,7 @@ export const RESPONSE_FORMAT = {
               suggested_store: { type: "string" },
               reason: { type: "string" },
               search_query: { type: "string" },
+              placement: { type: "string" },
             },
             required: [
               "name",
@@ -154,18 +167,19 @@ export const RESPONSE_FORMAT = {
               "suggested_store",
               "reason",
               "search_query",
+              "placement",
             ],
             additionalProperties: false,
           },
         },
-        buy_order: { type: "array", items: { type: "string" } },
+        quick_wins: { type: "array", items: { type: "string" } },
         total_estimated_cost: { type: "number" },
       },
       required: [
         "room_reading",
         "style_direction",
         "items",
-        "buy_order",
+        "quick_wins",
         "total_estimated_cost",
       ],
       additionalProperties: false,
@@ -191,6 +205,7 @@ export const GEMINI_RESPONSE_JSON_SCHEMA = {
           suggested_store: { type: "string" },
           reason: { type: "string" },
           search_query: { type: "string" },
+          placement: { type: "string" },
         },
         required: [
           "name",
@@ -200,17 +215,18 @@ export const GEMINI_RESPONSE_JSON_SCHEMA = {
           "suggested_store",
           "reason",
           "search_query",
+          "placement",
         ],
       },
     },
-    buy_order: { type: "array", items: { type: "string" } },
+    quick_wins: { type: "array", items: { type: "string" } },
     total_estimated_cost: { type: "number" },
   },
   required: [
     "room_reading",
     "style_direction",
     "items",
-    "buy_order",
+    "quick_wins",
     "total_estimated_cost",
   ],
 };

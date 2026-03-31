@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { GoogleGenAI, StyleReferenceImage } from "@google/genai";
+import { GoogleGenAI, RawReferenceImage } from "@google/genai";
 import Replicate from "replicate";
 
 export interface ImageGenResult {
@@ -55,14 +55,14 @@ async function generateWithImagen3(
 
   const base64Data = imageBuffer.toString("base64");
 
-  const styleRef = new StyleReferenceImage();
-  styleRef.referenceImage = { imageBytes: base64Data };
-  styleRef.config = { styleDescription: "interior room photograph" };
+  const rawRef = new RawReferenceImage();
+  rawRef.referenceImage = { imageBytes: base64Data };
+  rawRef.referenceId = 0;
 
   const response = await genai.models.editImage({
     model: "imagen-3.0-capability-001",
-    prompt,
-    referenceImages: [styleRef],
+    prompt: `Using reference image 0 as the base room photo: ${prompt}`,
+    referenceImages: [rawRef],
     config: {
       numberOfImages: 1,
     },
