@@ -43,35 +43,43 @@ export async function POST(req: NextRequest) {
       )
       .join("\n");
 
-    // Cinematic transformation prompt — faithful to the room but visually exciting
+    // Photo-editor prompt — faithful to the room, smart about real-world conditions
     const hasLighting = items.some((i) =>
       i.category.toLowerCase().includes("light")
     );
-    const editPrompt = `This is the user's real room photo. Create a cinematic "after" version that makes them excited about their room's potential.
+    const editPrompt = `You are a photo editor. Edit this real room photo to show what it would look like with a few new items added. The room must be instantly recognizable as the exact same room.
 
 Add these new items at the specified locations:
 ${itemList}
 
-What you MUST preserve (non-negotiable):
-- Same walls, floor, ceiling, bed/sofa, major furniture, and architectural features. The room must be instantly recognizable as THEIR room.
+ABSOLUTE RULES — never break these:
+- People: if anyone is visible, preserve them EXACTLY — same skin tone, same hair, same clothes, same position. Do NOT tint, recolor, reshape, or alter any person in any way.
+- Pets: if any animals are visible, preserve them EXACTLY — same fur color, same size, same position. Do NOT alter any animal.
+- Walls, floor, ceiling, major furniture, architectural features — keep exactly as they are. Same colors, same textures, same materials.
 
-Cinematic lighting & mood (this is KEY):
-- Shift the lighting to golden hour / warm evening ambiance — soft, warm, inviting.${hasLighting ? "\n- The new lighting items are ON and casting beautiful warm light, creating pools of light and gentle shadows." : "\n- Even without new lights, imagine the room at its best lighting moment — warm, soft, and atmospheric."}
-- Add subtle depth: gentle shadows, warm highlights, the cozy glow of a well-lit space.
-- Think "real estate photography at magic hour" — flattering but believable.
+Room lighting (subtle improvement only):
+- You may improve the ambient room lighting to feel slightly warmer and more inviting — as if better lamps were turned on.${hasLighting ? "\n- The new lighting items in the list are switched ON and casting a natural warm glow in their immediate area." : ""}
+- Apply lighting changes ONLY to room surfaces (walls, ceiling, floor reflections) — NEVER change the color of people, pets, furniture, or objects.
+- Think "the room has nicer lighting" — NOT "everything is orange/golden." Keep it believable and subtle.
 
-What you MAY do (styling touches):
-- Neatly organize what's already there — straighten bedding, fluff pillows, tidy surfaces.
-- Place new items naturally so they look like they've always been there.
-- Subtly freshen the space — like someone styled it for a photoshoot.
-- Add very subtle atmospheric warmth to make the space feel inviting and aspirational.
+Handling mess and clutter:
+- If the room is messy, that's fine — it's a real lived-in space. Keep it recognizable.
+- You may do VERY LIMITED tidying: straighten a crooked blanket, align pillows that are slightly off, fix a tilted frame.
+- Do NOT remove clutter, hide personal items, or dramatically reorganize. A few clothes on a chair, items on a desk, things on the floor — leave them. The owner knows their room is messy and will be suspicious if it's magically spotless.
+- The goal is "same room with new items added" — not "room that was cleaned by a crew."
+
+Placing new items:
+- Place the new items naturally so they look like they belong in the scene.
+- Items should have realistic scale, shadows, and lighting consistent with the room.
 
 What you must NOT do:
-- Do NOT add furniture, surfaces, or objects that aren't in the list above.
-- Do NOT change floor material, wall color, or any existing texture/finish.
-- Do NOT make it look unrealistically CGI or over-processed — it should still feel like a real photo.
+- Do NOT add objects that aren't in the item list above.
+- Do NOT change any surface material, paint color, or existing texture.
+- Do NOT apply color grading, filters, or heavy tone shifts to the whole image.
+- Do NOT make it look like CGI or a render — it should still feel like a real phone photo, just with new items placed in.
 
-The result should make the owner think: "Wow, my room could actually look like THAT with just a few changes?" — excited, inspired, and ready to buy.`;
+The owner should look at this and think: "That's definitely my room — but those new items look great in it."`;
+
 
     const size = pickSize(optimizedBuffer);
 

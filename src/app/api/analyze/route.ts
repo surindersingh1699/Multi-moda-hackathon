@@ -6,6 +6,7 @@ import {
   buildRecommendationPrompt,
   buildPromptWithPreferences,
 } from "@/lib/prompt";
+import type { StyleMode } from "@/lib/prompt";
 import {
   VISION_RESPONSE_FORMAT,
   RECOMMENDATION_RESPONSE_FORMAT,
@@ -65,7 +66,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { image, userPrompt, budget } = await req.json();
+    const { image, userPrompt, budget, styleMode: rawMode } = await req.json();
+    const styleMode: StyleMode =
+      rawMode === "smart_saver" || rawMode === "luxe_feel"
+        ? rawMode
+        : "balanced";
 
     if (!image || typeof image !== "string") {
       return jsonResponse({ error: "Missing or invalid image data" }, 400);
@@ -119,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     // Cache check — key includes prompt + budget so different vibes get fresh results
     const prompt = typeof userPrompt === "string" ? userPrompt.trim() : "";
-    const hash = imageHash(image) + `:${prompt}:${budgetNum}`;
+    const hash = imageHash(image) + `:${prompt}:${budgetNum}:${styleMode}`;
     const cached = getCached(hash);
     if (cached) {
       await supabase.from("usage").insert({ user_id: user.id });
@@ -174,7 +179,8 @@ export async function POST(req: NextRequest) {
             const recPrompt = buildRecommendationPrompt(
               analysis,
               budgetNum,
-              userPrompt
+              userPrompt,
+              styleMode
             );
             const recResult = (await callOpenAIRecommendations(
               openai,
@@ -193,7 +199,8 @@ export async function POST(req: NextRequest) {
             // Gemini-only path (single call with schema enforcement)
             const systemPrompt = buildPromptWithPreferences(
               userPrompt,
-              budgetNum
+              budgetNum,
+              styleMode
             );
             finalResult = (await callGemini(
               optimizedImage,
@@ -216,7 +223,8 @@ export async function POST(req: NextRequest) {
               const openai = new OpenAI();
               const retryPrompt = buildPromptWithPreferences(
                 userPrompt,
-                budgetNum
+                budgetNum,
+                styleMode
               );
               const retryResult = await callOpenAISingle(
                 openai,
@@ -227,7 +235,7 @@ export async function POST(req: NextRequest) {
               validated = validateResult(retryResult, budgetNum);
             } else if (process.env.GOOGLE_API_KEY) {
               const retryPrompt =
-                buildPromptWithPreferences(userPrompt, budgetNum) +
+                buildPromptWithPreferences(userPrompt, budgetNum, styleMode) +
                 "\n\n" +
                 retryHint;
               const retryResult = await callGemini(
