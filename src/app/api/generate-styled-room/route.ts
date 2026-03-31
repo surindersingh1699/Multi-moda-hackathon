@@ -43,19 +43,35 @@ export async function POST(req: NextRequest) {
       )
       .join("\n");
 
-    // Positive-framing prompt — works better with all image gen models
-    const editPrompt = `This is a real room photo. Keep everything exactly as it is — same walls, floor, furniture, layout, perspective, and structure.
+    // Cinematic transformation prompt — faithful to the room but visually exciting
+    const hasLighting = items.some((i) =>
+      i.category.toLowerCase().includes("light")
+    );
+    const editPrompt = `This is the user's real room photo. Create a cinematic "after" version that makes them excited about their room's potential.
 
-Your task: naturally add these specific small items into the existing room at the exact locations specified:
+Add these new items at the specified locations:
 ${itemList}
 
-Each item has a specific placement — follow it precisely. The items should look naturally integrated, matching the room's existing scale and perspective.
+What you MUST preserve (non-negotiable):
+- Same walls, floor, ceiling, bed/sofa, major furniture, and architectural features. The room must be instantly recognizable as THEIR room.
 
-${items.some((i) => i.category.toLowerCase().includes("light")) ? "Since lighting items are included, warm the overall lighting tone to a cozy golden-hour feel." : "Subtly warm the lighting tone — shift toward a soft golden-hour warmth as if late afternoon sunlight is filling the room."}
+Cinematic lighting & mood (this is KEY):
+- Shift the lighting to golden hour / warm evening ambiance — soft, warm, inviting.${hasLighting ? "\n- The new lighting items are ON and casting beautiful warm light, creating pools of light and gentle shadows." : "\n- Even without new lights, imagine the room at its best lighting moment — warm, soft, and atmospheric."}
+- Add subtle depth: gentle shadows, warm highlights, the cozy glow of a well-lit space.
+- Think "real estate photography at magic hour" — flattering but believable.
 
-Cinematic polish: Apply the kind of subtle elevation an interior design photographer would use — slightly richer tones, gentle depth of field with the new items in crisp focus, and a clean inviting ambiance. The room should feel aspirational and magazine-worthy, like a professional "after" photo from a room makeover.
+What you MAY do (styling touches):
+- Neatly organize what's already there — straighten bedding, fluff pillows, tidy surfaces.
+- Place new items naturally so they look like they've always been there.
+- Subtly freshen the space — like someone styled it for a photoshoot.
+- Add very subtle atmospheric warmth to make the space feel inviting and aspirational.
 
-Do NOT change the room layout, wall colors, existing furniture, or perspective. Only enhance mood, light, and atmosphere. The result should look like the same real room, beautifully photographed, with the new items naturally in place.`;
+What you must NOT do:
+- Do NOT add furniture, surfaces, or objects that aren't in the list above.
+- Do NOT change floor material, wall color, or any existing texture/finish.
+- Do NOT make it look unrealistically CGI or over-processed — it should still feel like a real photo.
+
+The result should make the owner think: "Wow, my room could actually look like THAT with just a few changes?" — excited, inspired, and ready to buy.`;
 
     const size = pickSize(optimizedBuffer);
 
