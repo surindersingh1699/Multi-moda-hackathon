@@ -1,66 +1,59 @@
-# Project: Budget Cozy Bedroom Stylist
+# Project: Roomify — AI Room Stylist
 
 ## Overview
-A web app that analyzes a bedroom photo and suggests affordable items to make it feel cozy and warm within a $150 budget.
+A web app that analyzes any room photo and suggests affordable styling items to transform the space within the user's budget ($50–$150).
 
 ---
 
 ## Level 1 MVP (Completed)
-- Upload bedroom photo
-- Send image to model
-- Receive structured JSON recommendations
-- Validate response
+- Upload room photo
+- AI vision analysis with room type auto-detection
+- 2-step pipeline: GPT-4o vision → GPT-4o-mini recommendations
+- Structured JSON recommendations with validation
 - Render polished UI with:
   - room reading
   - style direction
   - item cards
   - buy order
   - total cost
+- SSE streaming for progressive results
+- Content caching for repeat uploads
+- Multi-provider image generation (Imagen 3 → Flux → gpt-image-1)
 
 ---
 
-## Level 2 AR MVP (Current Focus)
-
-### Goal
-Allow users to preview one recommended item in their room using 3D preview and AR.
-
-### User Flow
-1. User uploads bedroom photo
-2. App generates recommendations
-3. User selects one item (plant or lamp)
-4. User opens preview:
-   - Desktop → 3D preview
-   - Mobile → AR mode (if supported)
-5. User places item in their space (AR)
-
----
-
-## Supported Categories (Level 2)
-- plant
-- lighting (lamp)
+## Supported Room Types
+- Bedroom
+- Living room
+- Kitchen
+- Bathroom
+- Office
+- Studio
+- Any room (auto-detected by GPT-4o vision)
 
 ---
 
 ## Requirements
-- Support only one item at a time
-- Add 3D preview before AR
-- Use simple AR integration (no custom engine)
-- Provide fallback for unsupported devices
+- Budget validation (sum of item prices must match total within 10%)
+- Server-side image optimization (sharp, 1536px max)
+- Graceful fallbacks at every level (OpenAI → Gemini → Mock)
+- Works with partial or no API keys (mock mode)
 
 ---
 
-## Non-Goals (Important)
-- Multiple items in AR
+## Non-Goals
 - Room measurement or scaling accuracy
 - Wall detection or anchoring
 - Occlusion or advanced realism
-- Real product inventory APIs
 - Full interior redesign
+- Real-time inventory tracking
 
 ---
 
 ## Definition of Done
-- User can preview item in 3D
-- AR works on supported mobile devices
-- Fallback preview works everywhere
-- Level 1 functionality remains intact
+- User uploads any room photo and gets relevant recommendations
+- Room type is correctly identified
+- All items are within budget
+- Styled room preview generates successfully
+- Product links are real and clickable
+- App works with partial API keys

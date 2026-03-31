@@ -1,46 +1,53 @@
 # PROJECT STATE
 
 ## Current Milestone
-Level 2 AR MVP
+ML Pipeline Optimization
 
 ---
 
 ## Done Means
-- User selects a recommendation
-- 3D preview loads successfully
-- AR launches on supported mobile devices
-- Fallback preview works on unsupported devices
-- No regression in Level 1 functionality
-
----
-
-## Next Tasks
-1. Add AR asset fields to supported items (modelUrl, etc.)
-2. Implement 3D preview component using model viewer
-3. Add preview modal/page
-4. Add AR launch support (mobile only)
-5. Add fallback logic for unsupported environments
-
----
-
-## Blockers
-- Need working GLB models
-- Need real device testing (iPhone)
-- Potential AR compatibility issues
+- 2-step analysis pipeline (GPT-4o vision + GPT-4o-mini recommendations)
+- Server-side image optimization with sharp
+- SSE streaming from /api/analyze
+- Content caching by image hash
+- Multi-provider image generation (Imagen 3 → Flux → gpt-image-1)
+- Room type auto-detection (no bedroom hardcoding)
+- Gemini fallback with JSON schema enforcement
+- Price sum validation
+- No TypeScript build errors
 
 ---
 
 ## Completed
 - UI shell
-- API integration
-- JSON validation
+- API integration (analyze, find-products, generate-styled-room)
+- JSON validation + price sum check
 - Recommendation rendering
 - Loading + error states
+- Supabase auth with Google OAuth
+- Usage limits (5 free generations)
+- PostHog analytics
+- HEIC conversion support
+- 2-step analysis pipeline
+- Sharp image optimization
+- SSE streaming
+- Content caching
+- Multi-provider image generation abstraction
+- Positive-framing prompts
+- Room-type-agnostic prompts
 
 ---
 
-## Later (Do Not Touch Now)
+## Next Tasks
+1. Test Imagen 3 with real GOOGLE_API_KEY
+2. Test Flux Kontext with real REPLICATE_API_TOKEN
+3. Verify SSE streaming end-to-end in browser
+4. Replace SerpAPI with direct product search solution
+
+---
+
+## Later
+- AR/3D preview for recommended items
 - Multiple item placement
 - Save designs
-- Real product APIs
-- Advanced AR features
+- Advanced product APIs

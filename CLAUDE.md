@@ -8,21 +8,10 @@
 
 ---
 
-## Level 1 Rules (Still Apply)
-- Do not break recommendation pipeline
-- Do not modify API behavior unnecessarily
-- Keep UI stable
-
----
-
-## Level 2 AR Rules
-- Build 3D preview BEFORE AR
-- Support only ONE item at a time
-- Start with plant and lamp categories only
-- Do not build custom AR engine
-- Use simplest integration approach
-- Add fallback for unsupported devices
-- Do not expand scope beyond AR preview
+## Pipeline Rules
+- Do not break the recommendation pipeline (analyze → find-products → generate-styled-room)
+- Do not modify API response shapes without updating client consumers
+- Keep UI stable — test after every backend change
 
 ---
 
@@ -30,46 +19,35 @@
 - One task per prompt
 - Do not refactor unrelated code
 - Validate functionality after each step
-- Keep components modular (ar/ folder)
+- Keep components modular
 
 ---
 
-## Folder Structure Suggestion
-
-components/
-  ar/
-    ModelViewer.tsx
-    ArPreview.tsx
-    ArButton.tsx
-
-public/
-  models/
-    plant.glb
-    lamp.glb
-
-lib/
-  ar/
-    utils.ts
-    supportedItems.ts
+## Architecture Notes
+- 2-step analysis: GPT-4o vision (detail: high) → GPT-4o-mini text recommendations
+- Image generation fallback chain: Imagen 3 → Flux Kontext → gpt-image-1
+- AI fallback: OpenAI → Gemini → Mock data
+- Server-side image optimization with sharp (1536px max)
+- SSE streaming from /api/analyze (cache hits return plain JSON)
+- Content cache by image hash (1hr TTL, 100 entries)
 
 ---
 
-## Testing Rules
-- First test on desktop (3D preview)
-- Then test on mobile (AR)
-- Never debug AR before preview works
-
----
-
-## Fallback Rules
-- If AR fails → use 3D preview
-- If model fails → show fallback UI
-- If device unsupported → disable AR button
+## Key Files
+- `src/lib/image.ts` — sharp optimization + hashing
+- `src/lib/image-gen.ts` — multi-provider image generation
+- `src/lib/prompt.ts` — split vision + recommendation prompts
+- `src/lib/schema.ts` — types + OpenAI/Gemini JSON schemas
+- `src/lib/validate.ts` — server + client validators
+- `src/app/api/analyze/route.ts` — SSE streaming analysis
+- `src/app/api/generate-styled-room/route.ts` — image editing
+- `src/app/api/find-products/route.ts` — SerpAPI product search
 
 ---
 
 ## Anti-Patterns (Avoid)
 - Adding multiple features at once
-- Breaking Level 1 flow
-- Overengineering AR
-- Debugging everything at once
+- Breaking existing API response shapes
+- Hardcoding room types (room type is auto-detected)
+- Sending unoptimized images to APIs
+- Using `detail: "low"` on vision calls

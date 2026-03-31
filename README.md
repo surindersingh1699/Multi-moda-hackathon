@@ -1,6 +1,6 @@
-# Roomify — AI Bedroom Stylist on a Real Budget
+# Roomify — AI Room Stylist on a Real Budget
 
-Snap your bedroom photo. Get a designer makeover plan in 30 seconds — with real, shoppable products from Amazon, Target & IKEA, all under your budget.
+Snap your room photo. Get a designer makeover plan in 30 seconds — with real, shoppable products from Amazon, Target & IKEA, all under your budget.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![GPT-4o](https://img.shields.io/badge/GPT--4o-Vision-412991?logo=openai)
@@ -11,7 +11,7 @@ Snap your bedroom photo. Get a designer makeover plan in 30 seconds — with rea
 
 ## How It Works
 
-1. **Upload** a bedroom photo
+1. **Upload** a room photo (bedroom, living room, kitchen, office — any room)
 2. **Pick a vibe** — Cozy Hygge, Minimalist, Boho Chic, Dark Academia, or Cottagecore
 3. **Set your budget** — $50, $100, or $150
 4. **AI analyzes** your room and recommends 4–6 high-impact styling items
@@ -20,14 +20,16 @@ Snap your bedroom photo. Get a designer makeover plan in 30 seconds — with rea
 
 ## Features
 
-- **AI Room Analysis** — GPT-4o Vision with Gemini 2.5 Flash fallback
+- **AI Room Analysis** — GPT-4o Vision (detail: high) with Gemini 2.5 Flash fallback
+- **2-Step Pipeline** — Vision analysis (GPT-4o) + text recommendations (GPT-4o-mini) for better quality at lower cost
+- **SSE Streaming** — Progressive results as analysis completes
 - **Smart Shopping Agent** — Searches Amazon first (with ASINs for add-to-cart), falls back to Google Shopping
-- **Styled Room Preview** — gpt-image-1 edits your actual photo; DALL-E 3 fallback
+- **Styled Room Preview** — Multi-provider image generation (Imagen 3 → Flux Kontext → gpt-image-1)
 - **Before/After Slider** — Interactive drag comparison
 - **Budget Tracking** — All recommendations validated to stay within budget
 - **Vibe Reroll** — Quick-switch between 5 aesthetic styles without re-uploading
 - **Copy & Share** — Export your shopping list or share via Web Share API
-- **Celebration Effects** — Confetti + audio chime when your makeover is ready
+- **Content Caching** — Identical photos return cached results instantly
 - **Graceful Fallbacks** — Works with partial API keys; full mock mode with no keys at all
 
 ## Tech Stack
@@ -37,9 +39,13 @@ Snap your bedroom photo. Get a designer makeover plan in 30 seconds — with rea
 | Framework | Next.js 16 (React 19) |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS v4 |
-| AI Vision | OpenAI GPT-4o / Google Gemini 2.5 Flash |
-| Image Gen | gpt-image-1 / DALL-E 3 |
+| AI Vision | OpenAI GPT-4o (detail: high) / Google Gemini 2.5 Flash |
+| AI Recommendations | OpenAI GPT-4o-mini |
+| Image Gen | Imagen 3 / Flux Kontext / gpt-image-1 |
+| Image Optimization | sharp |
 | Product Search | SerpAPI (Amazon + Google Shopping) |
+| Auth | Supabase (Google OAuth) |
+| Analytics | PostHog |
 | Deployment | Vercel |
 
 ## Getting Started
@@ -63,11 +69,22 @@ Create a `.env.local` file in the project root:
 
 ```bash
 # Required — at least one AI provider
-OPENAI_API_KEY=sk-proj-...       # GPT-4o + DALL-E 3
-GOOGLE_API_KEY=AIzaSy...         # Gemini fallback
+OPENAI_API_KEY=sk-proj-...       # GPT-4o + gpt-image-1
+GOOGLE_API_KEY=AIzaSy...         # Gemini fallback + Imagen 3
+
+# Image Generation — Flux Kontext (via Replicate)
+REPLICATE_API_TOKEN=             # replicate.com API token
 
 # Required — for real product search
 SERPAPI_KEY=...                   # serpapi.com API key
+
+# Auth (optional)
+NEXT_PUBLIC_SUPABASE_URL=        # Supabase project URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=  # Supabase anon key
+
+# Analytics (optional)
+NEXT_PUBLIC_POSTHOG_KEY=         # PostHog project key
+NEXT_PUBLIC_POSTHOG_HOST=        # PostHog host URL
 ```
 
 > **No keys?** The app runs in full mock mode with demo data — great for testing the UI.
@@ -84,10 +101,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### `POST /api/analyze`
 
-Analyzes a bedroom photo and returns styling recommendations.
+Analyzes a room photo and returns styling recommendations via SSE streaming.
 
 - **Input:** Base64 image, optional style prompt, budget
-- **Output:** Room reading, style direction, 4–6 items with prices, buy order
+- **Output (SSE):** `analysis` → `recommendations` → `complete` events
+- **Output (JSON):** Full result on cache hit or mock mode
 - **Fallback:** OpenAI GPT-4o → Google Gemini → Mock data
 
 ### `POST /api/find-products`
@@ -102,9 +120,9 @@ Finds real shoppable products matching AI recommendations.
 
 Generates a before/after visualization of the styled room.
 
-- **Input:** Base64 image, style direction, item list
-- **Output:** Styled room image (base64)
-- **Fallback:** gpt-image-1 edit → DALL-E 3 generation
+- **Input:** Base64 image, item list
+- **Output:** Styled room image (base64), provider name
+- **Fallback:** Imagen 3 → Flux Kontext → gpt-image-1
 
 ## Project Structure
 
@@ -112,27 +130,25 @@ Generates a before/after visualization of the styled room.
 src/
   app/
     api/
-      analyze/           # Room analysis (GPT-4o / Gemini)
-      find-products/     # Product search (SerpAPI)
-      generate-styled-room/  # Image generation (DALL-E / gpt-image-1)
-    page.tsx             # Main app UI + state
-    layout.tsx           # Root layout + metadata
-    globals.css          # Tailwind theme + animations
+      analyze/               # Room analysis (GPT-4o → GPT-4o-mini, SSE)
+      find-products/          # Product search (SerpAPI)
+      generate-styled-room/   # Image generation (Imagen 3 / Flux / gpt-image-1)
+    page.tsx                  # Main app UI + state
+    layout.tsx                # Root layout + metadata
+    globals.css               # Tailwind theme + animations
   components/
-    ImageUpload.tsx      # Drag-drop photo upload
-    ResultsDisplay.tsx   # Results panel + shopping list
-    DoodleElements.tsx   # Decorative SVG illustrations
+    ImageUpload.tsx           # Drag-drop photo upload
+    ResultsDisplay.tsx        # Results panel + shopping list
+    DoodleElements.tsx        # Decorative SVG illustrations
   lib/
-    schema.ts            # TypeScript types + OpenAI response format
-    validate.ts          # Server + client validators
-    prompt.ts            # System prompt builder
-    mock.ts              # Demo mode fixture data
+    schema.ts                 # TypeScript types + JSON schemas
+    validate.ts               # Server + client validators
+    prompt.ts                 # Vision + recommendation prompts
+    image.ts                  # Sharp optimization + hashing
+    image-gen.ts              # Multi-provider image generation
+    mock.ts                   # Demo mode fixture data
 ```
 
 ## Deployment
 
 The app auto-deploys to Vercel on push to `master`. Set your environment variables in the Vercel dashboard under **Settings → Environment Variables**.
-
-## Built With
-
-Made at **Hackathon 2026** with GPT-4o, DALL-E 3, Gemini, Next.js 16, Tailwind 4, and SerpAPI.
