@@ -124,17 +124,63 @@ export default function Home() {
         throw new Error(body.error || `Request failed (${res.status})`);
       }
 
-      const raw = await res.json();
-      const parsed = parseResultSafe(raw);
-      if (!parsed.ok) {
-        throw new Error(`Invalid response: ${parsed.error}`);
-      }
+      const contentType = res.headers.get("content-type") ?? "";
 
-      // Buffer result — reveal after loading animation completes
-      // Product search fires post-reveal in parallel with styled image
-      pendingResultRef.current = { data: parsed.data, base64 };
-      setApiDone(true);
-      refreshUsage();
+      if (contentType.includes("text/event-stream")) {
+        // Handle SSE stream from the optimized analyze endpoint
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let eventType = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ") && eventType) {
+              const data = JSON.parse(line.slice(6));
+
+              if (eventType === "complete") {
+                const parsed = parseResultSafe(data);
+                if (!parsed.ok) throw new Error(`Invalid response: ${parsed.error}`);
+                pendingResultRef.current = { data: parsed.data, base64 };
+                setApiDone(true);
+                refreshUsage();
+              } else if (eventType === "error") {
+                throw new Error(data.error || "Analysis failed");
+              }
+              // "analysis" and "recommendations" events are intermediate —
+              // the loading animation still plays through, and results reveal
+              // after the "complete" event via the existing pendingResultRef flow.
+
+              eventType = "";
+            }
+          }
+        }
+
+        if (!pendingResultRef.current) {
+          throw new Error("Stream ended without complete result");
+        }
+      } else {
+        // Fallback: plain JSON response (cache hits, mock mode)
+        const raw = await res.json();
+        const parsed = parseResultSafe(raw);
+        if (!parsed.ok) {
+          throw new Error(`Invalid response: ${parsed.error}`);
+        }
+        pendingResultRef.current = { data: parsed.data, base64 };
+        setApiDone(true);
+        refreshUsage();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setAppState("error");
@@ -199,7 +245,7 @@ export default function Home() {
   useEffect(() => {
     document.title = appState === "results"
       ? "My Room Makeover — Roomify"
-      : "Roomify — AI Bedroom Stylist";
+      : "Roomify — AI Room Stylist";
   }, [appState]);
 
   // Scroll to results when they appear
@@ -380,7 +426,7 @@ export default function Home() {
                     </span>
                   </h2>
                   <p className="text-base sm:text-lg font-medium text-txt-primary max-w-md mx-auto leading-relaxed">
-                    Snap your bedroom. Get a designer<br />makeover plan in 30 seconds.
+                    Snap your room. Get a designer<br />makeover plan in 30 seconds.
                   </p>
                   <p className="text-sm text-txt-secondary max-w-sm mx-auto">
                     Real products. Real prices. Real links.<br />All under your budget.
@@ -667,11 +713,11 @@ export default function Home() {
         <div className="flex items-center justify-center gap-2">
           <DoodleBear className="w-5 h-5" />
           <p className="text-xs text-txt-muted">
-            Made with love at <span className="font-semibold text-txt-secondary">Hackathon 2026</span>
+            Powered by <span className="font-semibold text-txt-secondary">Roomify</span>
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-1 text-[10px] text-txt-muted">
-          {["GPT-4o", "DALL-E 3", "Gemini", "Next.js 16", "Tailwind 4", "SerpAPI"].map((tech, i) => (
+          {["GPT-4o", "Imagen 3", "Flux", "Gemini", "Next.js 16", "Tailwind 4"].map((tech, i) => (
             <span key={tech}>
               {tech}{i < 5 && <span className="mx-1 text-accent-200">·</span>}
             </span>
