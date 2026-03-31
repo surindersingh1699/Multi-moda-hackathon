@@ -7,6 +7,11 @@ interface Props {
   budget?: number;
   productMatches?: ProductMatch[];
   isSearchingProducts?: boolean;
+  /** Set of favorited item names (lowercase) for instant UI feedback */
+  favoriteNames?: Set<string>;
+  onToggleFavorite?: (item: StylingItem, match?: ProductMatch) => void;
+  onShare?: () => void;
+  isSharing?: boolean;
 }
 
 function findMatch(item: StylingItem, matches: ProductMatch[]): ProductMatch | undefined {
@@ -20,6 +25,10 @@ export default function ResultsDisplay({
   budget = 150,
   productMatches = [],
   isSearchingProducts = false,
+  favoriteNames = new Set(),
+  onToggleFavorite,
+  onShare,
+  isSharing = false,
 }: Props) {
   const [copiedList, setCopiedList] = useState(false);
   const [shared, setShared] = useState(false);
@@ -52,6 +61,11 @@ export default function ResultsDisplay({
   };
 
   const handleShare = async () => {
+    // Use the enhanced share handler if provided (for image sharing)
+    if (onShare) {
+      onShare();
+      return;
+    }
     const text = `Check out my AI room makeover plan from Roomify! ${items.length} items for $${totalCost}.`;
     if (navigator.share) {
       try {
@@ -174,15 +188,20 @@ export default function ResultsDisplay({
         )}
 
         <div className="grid gap-3">
-          {items.map((item, index) => (
-            <ItemCard
-              key={index}
-              item={item}
-              index={index}
-              match={findMatch(item, productMatches)}
-              isSearching={isSearchingProducts}
-            />
-          ))}
+          {items.map((item, index) => {
+            const match = findMatch(item, productMatches);
+            return (
+              <ItemCard
+                key={index}
+                item={item}
+                index={index}
+                match={match}
+                isSearching={isSearchingProducts}
+                isFavorited={favoriteNames.has(item.name.toLowerCase())}
+                onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(item, match) : undefined}
+              />
+            );
+          })}
         </div>
       </section>
 
@@ -201,14 +220,15 @@ export default function ResultsDisplay({
         </button>
         <button
           onClick={handleShare}
-          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.98]"
+          disabled={isSharing}
+          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.98] disabled:opacity-70"
           style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
         >
           <span className="flex items-center justify-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
-            {shared ? "Shared!" : "Share My Makeover"}
+            {isSharing ? "Creating share..." : shared ? "Shared!" : "Share My Makeover"}
           </span>
         </button>
       </div>
@@ -255,18 +275,30 @@ function ItemCard({
   index,
   match,
   isSearching,
+  isFavorited,
+  onToggleFavorite,
 }: {
   item: StylingItem;
   index: number;
   match?: ProductMatch;
   isSearching?: boolean;
+  isFavorited?: boolean;
+  onToggleFavorite?: () => void;
 }) {
+  const [animating, setAnimating] = useState(false);
   const name = item.name || "Unnamed item";
   const price = typeof item.estimated_price === "number" ? item.estimated_price : 0;
   const category = item.category || "item";
   const store = item.suggested_store || "Store";
   const searchQuery = item.search_query || name;
   const placement = item.placement || "";
+
+  const handleFavorite = () => {
+    if (!onToggleFavorite) return;
+    setAnimating(true);
+    onToggleFavorite();
+    setTimeout(() => setAnimating(false), 400);
+  };
 
   return (
     <div
@@ -298,6 +330,23 @@ function ItemCard({
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-txt-primary">{name}</h3>
           <div className="shrink-0 flex items-center gap-1.5">
+            {/* Favorite heart button */}
+            {onToggleFavorite && (
+              <button
+                onClick={handleFavorite}
+                className={`p-1 rounded-full transition-colors ${animating ? "animate-heartPop" : ""}`}
+                title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+              >
+                <svg
+                  className={`w-4 h-4 transition-colors ${isFavorited ? "text-rose-400 fill-rose-400" : "text-accent-200 hover:text-rose-400"}`}
+                  fill={isFavorited ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+            )}
             {match && match.real_price != null && match.real_price !== price && (
               <span className="text-[10px] text-txt-muted line-through">${price}</span>
             )}

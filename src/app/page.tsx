@@ -1,21 +1,32 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import confetti from "canvas-confetti";
 import ImageUpload from "@/components/ImageUpload";
 import ResultsDisplay from "@/components/ResultsDisplay";
 import AuthModal from "@/components/AuthModal";
 import UsageBanner from "@/components/UsageBanner";
+import HistoryPanel from "@/components/HistoryPanel";
+import FavoritesPanel from "@/components/FavoritesPanel";
+import CompareView from "@/components/CompareView";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import {
+  saveAnalysis,
+  updateAnalysisStyledImage,
+  updateAnalysisProducts,
+  addFavorite,
+  removeFavoriteByItem,
+  fetchFavorites,
+} from "@/lib/supabase/db";
+import type { FavoriteRow } from "@/lib/supabase/db";
 import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCamera, DoodleLamp, DoodleHeart, DoodleFrame, FloatingDoodles } from "@/components/DoodleElements";
 import { parseResultSafe } from "@/lib/validate";
 import { trackUploadPhoto, trackGenerateRoom } from "@/lib/analytics";
-import type { StylingResult, ProductMatch, ProductSearchResult } from "@/lib/schema";
+import type { StylingResult, ProductMatch, ProductSearchResult, StylingItem } from "@/lib/schema";
 
 const MAX_USES = 5;
-
-
+const PENDING_IMAGE_KEY = "roomify_pending_image";
 
 type AppState = "idle" | "loading" | "error" | "results";
 
@@ -66,6 +77,129 @@ export default function Home() {
   const [apiDone, setApiDone] = useState(false);
   const pendingResultRef = useRef<{ data: StylingResult; base64: string } | null>(null);
 
+  // History, Favorites, Compare panel state
+  const [showHistory, setShowHistory] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const currentAnalysisId = useRef<string | null>(null);
+
+  // Favorites state — loaded once, updated optimistically
+  const [favorites, setFavorites] = useState<FavoriteRow[]>([]);
+  const favoriteNames = useMemo(
+    () => new Set(favorites.map((f) => f.item_name.toLowerCase())),
+    [favorites],
+  );
+
+  // Load favorites when user logs in
+  useEffect(() => {
+    if (!user) { setFavorites([]); return; }
+    const supabase = createClient();
+    fetchFavorites(supabase, user.id).then(setFavorites);
+  }, [user]);
+
+  const handleToggleFavorite = useCallback(
+    async (item: StylingItem, match?: ProductMatch) => {
+      if (!user) { setShowAuthModal(true); return; }
+      const supabase = createClient();
+      const key = item.name.toLowerCase();
+      const existing = favorites.find((f) => f.item_name.toLowerCase() === key);
+
+      if (existing) {
+        // Optimistic remove
+        setFavorites((prev) => prev.filter((f) => f.id !== existing.id));
+        await removeFavoriteByItem(supabase, user.id, item.name);
+      } else {
+        // Optimistic add with temp row
+        const tempId = crypto.randomUUID();
+        const tempRow: FavoriteRow = {
+          id: tempId,
+          user_id: user.id,
+          analysis_id: currentAnalysisId.current,
+          item_name: item.name,
+          item_category: item.category,
+          estimated_price: item.estimated_price,
+          search_query: item.search_query,
+          placement: item.placement,
+          reason: item.reason,
+          product_url: match?.product_url ?? null,
+          product_title: match?.product_title ?? null,
+          real_price: match?.real_price ?? null,
+          store: match?.store ?? null,
+          thumbnail: match?.thumbnail ?? null,
+          created_at: new Date().toISOString(),
+        };
+        setFavorites((prev) => [tempRow, ...prev]);
+        const realId = await addFavorite(supabase, user.id, item, currentAnalysisId.current ?? undefined, match);
+        if (realId) {
+          setFavorites((prev) => prev.map((f) => (f.id === tempId ? { ...f, id: realId } : f)));
+        }
+      }
+    },
+    [user, favorites],
+  );
+
+  // Load a past analysis from history
+  const handleLoadAnalysis = useCallback(
+    (params: {
+      result: StylingResult;
+      previewUrl: string | null;
+      styledImageUrl: string | null;
+      productMatches: ProductMatch[];
+      budget: number;
+      vibe: string | null;
+    }) => {
+      setResult(params.result);
+      setPreviewUrl(params.previewUrl);
+      setStyledImageUrl(params.styledImageUrl);
+      setProductMatches(params.productMatches);
+      setBudget(params.budget);
+      setActiveVibe(params.vibe);
+      setAppState("results");
+      setFile(null);
+      setError(null);
+      setIsGeneratingImage(false);
+      setImageGenFailed(false);
+      setProductSearchFailed(false);
+    },
+    [],
+  );
+
+  // Social sharing — creates a shareable link with OG metadata
+  const [isSharing, setIsSharing] = useState(false);
+  const handleShare = useCallback(async () => {
+    if (!result) return;
+    setIsSharing(true);
+    try {
+      const res = await fetch("/api/share-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          afterImageUrl: styledImageUrl || null,
+          styleDirection: result.style_direction,
+          totalCost: result.total_estimated_cost,
+          itemCount: result.items?.length ?? 0,
+          analysisId: currentAnalysisId.current,
+        }),
+      });
+
+      if (res.ok) {
+        const { shareUrl, title } = await res.json();
+        const shareText = `Check out my AI room makeover! ${result.items?.length ?? 0} items for $${result.total_estimated_cost ?? 0}.`;
+
+        if (navigator.share) {
+          await navigator.share({ title, text: shareText, url: shareUrl });
+        } else {
+          await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+          // Brief visual feedback would be handled by the button state
+        }
+      }
+    } catch {
+      // User cancelled or share failed
+    } finally {
+      setIsSharing(false);
+    }
+  }, [result, styledImageUrl]);
+
   const onImageSelected = useCallback((f: File, url: string) => {
     setFile(f);
     setPreviewUrl(url);
@@ -83,7 +217,44 @@ export default function Home() {
       file_type: f.type,
       file_size_kb: Math.round(f.size / 1024),
     });
+    // Persist image to sessionStorage so it survives OAuth redirects
+    fileToBase64(f).then((b64) => {
+      try {
+        sessionStorage.setItem(PENDING_IMAGE_KEY, JSON.stringify({
+          base64: b64,
+          name: f.name,
+          type: f.type,
+        }));
+      } catch {
+        // sessionStorage full or unavailable — ignore
+      }
+    });
   }, []);
+
+  // Restore pending image after OAuth redirect
+  useEffect(() => {
+    if (file || authLoading) return;
+    try {
+      const stored = sessionStorage.getItem(PENDING_IMAGE_KEY);
+      if (!stored) return;
+      const { base64, name, type } = JSON.parse(stored) as {
+        base64: string; name: string; type: string;
+      };
+      // Convert base64 data URL back to a File
+      const byteString = atob(base64.split(",")[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const restored = new File([ab], name, { type });
+      const url = URL.createObjectURL(restored);
+      setFile(restored);
+      setPreviewUrl(url);
+      // Clear after restore — only needed for one redirect
+      sessionStorage.removeItem(PENDING_IMAGE_KEY);
+    } catch {
+      sessionStorage.removeItem(PENDING_IMAGE_KEY);
+    }
+  }, [file, authLoading]);
 
   const analyze = async (promptOverride?: string) => {
     if (!file) return;
@@ -202,6 +373,11 @@ export default function Home() {
         const data: ProductSearchResult = await res.json();
         if (data.matches?.length > 0) {
           setProductMatches(data.matches);
+          // Persist product matches to Supabase
+          if (currentAnalysisId.current) {
+            const supabase = createClient();
+            updateAnalysisProducts(supabase, currentAnalysisId.current, data.matches);
+          }
         } else {
           setProductSearchFailed(true);
         }
@@ -233,6 +409,11 @@ export default function Home() {
         const data = await res.json();
         if (data.styledImageUrl) {
           setStyledImageUrl(data.styledImageUrl);
+          // Persist styled image URL to Supabase
+          if (currentAnalysisId.current) {
+            const supabase = createClient();
+            updateAnalysisStyledImage(supabase, currentAnalysisId.current, data.styledImageUrl);
+          }
         }
       }
     } catch {
@@ -321,13 +502,28 @@ export default function Home() {
     if (appState !== "loading" || !apiDone || loadingStep < LOADING_STEPS.length - 1) return;
     if (!pendingResultRef.current) return;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const pending = pendingResultRef.current;
       if (!pending) return;
       pendingResultRef.current = null;
       setResult(pending.data);
       setAppState("results");
       setApiDone(false);
+
+      // Save analysis to Supabase (fire-and-forget)
+      if (user) {
+        const supabase = createClient();
+        const id = await saveAnalysis(supabase, {
+          userId: user.id,
+          result: pending.data,
+          imageBase64: pending.base64,
+          userPrompt: userPrompt.trim() || undefined,
+          budget,
+          vibe: activeVibe,
+        });
+        currentAnalysisId.current = id;
+      }
+
       generateStyledRoom(pending.base64, pending.data);
       findProducts(pending.data);
     }, 800);
@@ -355,6 +551,7 @@ export default function Home() {
     setApiDone(false);
     pendingResultRef.current = null;
     setAppState("idle");
+    try { sessionStorage.removeItem(PENDING_IMAGE_KEY); } catch {}
   };
 
   return (
@@ -371,10 +568,52 @@ export default function Home() {
               Roomify
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {user && (
+              <>
+                {/* Favorites button */}
+                <button
+                  onClick={() => setShowFavorites(true)}
+                  className="relative flex h-7 w-7 items-center justify-center rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors"
+                  title="My Favorites"
+                >
+                  <svg className="w-3.5 h-3.5 text-rose-400" fill={favorites.length > 0 ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {favorites.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-400 text-white text-[8px] font-bold flex items-center justify-center">
+                      {favorites.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* History button */}
+                <button
+                  onClick={() => setShowHistory(true)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors"
+                  title="My Makeovers"
+                >
+                  <svg className="w-3.5 h-3.5 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+
+                {/* Compare button */}
+                <button
+                  onClick={() => setShowCompare(true)}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors"
+                  title="Compare Rooms"
+                >
+                  <svg className="w-3.5 h-3.5 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+                  </svg>
+                </button>
+              </>
+            )}
+
             {user && usageCount !== null && (
-              <span className="text-[10px] font-medium text-txt-muted">
-                {usageCount}/{MAX_USES} uses
+              <span className="text-[10px] font-medium text-txt-muted ml-1">
+                {usageCount}/{MAX_USES}
               </span>
             )}
             {authLoading ? null : user ? (
@@ -673,11 +912,28 @@ export default function Home() {
 
             {/* Before/After Slider — Phase 2 */}
             {styledImageUrl && previewUrl && (
-              <div className="animate-fadeIn">
+              <div className="animate-fadeIn space-y-2">
                 <BeforeAfterSlider
                   beforeSrc={previewUrl}
                   afterSrc={styledImageUrl}
                 />
+                {/* Download before/after */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = styledImageUrl;
+                      link.download = "roomify-makeover.jpg";
+                      link.click();
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-txt-muted hover:text-accent-500 transition-colors px-3 py-1.5 rounded-full border border-accent-100 hover:border-accent-300"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download Image
+                  </button>
+                </div>
               </div>
             )}
 
@@ -714,6 +970,10 @@ export default function Home() {
               budget={budget}
               productMatches={productMatches}
               isSearchingProducts={productMatches.length === 0 && !productSearchFailed && appState === "results"}
+              favoriteNames={favoriteNames}
+              onToggleFavorite={handleToggleFavorite}
+              onShare={handleShare}
+              isSharing={isSharing}
             />
 
             <button
@@ -751,6 +1011,21 @@ export default function Home() {
       {showAuthModal && (
         <AuthModal onClose={() => setShowAuthModal(false)} />
       )}
+
+      {/* Slide-out panels */}
+      <HistoryPanel
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        onLoadAnalysis={handleLoadAnalysis}
+      />
+      <FavoritesPanel
+        open={showFavorites}
+        onClose={() => setShowFavorites(false)}
+      />
+      <CompareView
+        open={showCompare}
+        onClose={() => setShowCompare(false)}
+      />
     </div>
   );
 }
