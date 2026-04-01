@@ -58,8 +58,8 @@ import { DoodleCamera, DoodleStar } from "@/components/DoodleElements";
 
 const MAX_SIZE_MB = 20; // accept up to 20MB uploads; we compress client-side
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
-const TARGET_SIZE_BYTES = 3.5 * 1024 * 1024; // compress down to under 4MB
-const MAX_DIMENSION = 2048;
+const TARGET_SIZE_BYTES = 1 * 1024 * 1024; // 1MB target — server resizes to 1536px anyway
+const MAX_DIMENSION = 1536; // match server-side optimizeForVision limit
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const HEIC_TYPES = ["image/heic", "image/heif"];
 
@@ -69,19 +69,20 @@ const HEIC_TYPES = ["image/heic", "image/heif"];
  */
 const compressImage = (file: File): Promise<File> =>
   new Promise((resolve, reject) => {
-    // If already small enough, skip compression
-    if (file.size <= TARGET_SIZE_BYTES) {
-      resolve(file);
-      return;
-    }
-
     const url = URL.createObjectURL(file);
     const img = new window.Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
 
-      // Calculate resize dimensions
       let { naturalWidth: w, naturalHeight: h } = img;
+
+      // Skip only if dimensions AND file size are already within limits
+      if (w <= MAX_DIMENSION && h <= MAX_DIMENSION && file.size <= TARGET_SIZE_BYTES) {
+        resolve(file);
+        return;
+      }
+
+      // Calculate resize dimensions
       if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
         const scale = MAX_DIMENSION / Math.max(w, h);
         w = Math.round(w * scale);

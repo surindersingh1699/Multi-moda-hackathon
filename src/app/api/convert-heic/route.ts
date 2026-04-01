@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 413 });
     }
 
-    const jpeg = await convert({ buffer: new Uint8Array(buf).buffer, format: "JPEG", quality: 0.9 });
+    const jpeg = await convert({ buffer: new Uint8Array(buf) as unknown as ArrayBuffer, format: "JPEG", quality: 0.9 });
 
     return new NextResponse(new Uint8Array(jpeg), {
       headers: { "Content-Type": "image/jpeg" },

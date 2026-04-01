@@ -19,7 +19,7 @@ function isHeicBuffer(buf: Buffer): boolean {
 /** Convert HEIC buffer to JPEG if needed (sharp lacks HEVC decoder). */
 async function ensureDecodable(buf: Buffer, mimeType: string): Promise<Buffer> {
   if (HEIC_MIME_TYPES.includes(mimeType) || isHeicBuffer(buf)) {
-    const jpegBuf = await convert({ buffer: new Uint8Array(buf).buffer, format: "JPEG", quality: 0.92 });
+    const jpegBuf = await convert({ buffer: new Uint8Array(buf) as unknown as ArrayBuffer, format: "JPEG", quality: 0.92 });
     return Buffer.from(jpegBuf);
   }
   return buf;
