@@ -67,11 +67,12 @@ export async function POST(req: NextRequest) {
     const basePrompt = `You are a professional room stylist photographing a transformation. This is a real photo of a room. You are creating the "AFTER" shot — same room, same furniture, but with new items that completely shift the atmosphere.
 
 PRESERVE THE ROOM — this is the #1 rule, above everything else:
-- Every existing piece of furniture (tables, TVs, sofas, beds, desks, chairs, shelves, dressers) must remain the EXACT same size, shape, position, proportion, and color. A table that is 3 feet wide in the original must be 3 feet wide in the output. Do NOT shrink, stretch, warp, resize, move, or reshape ANY existing furniture.
-- Same walls, floor, ceiling, objects, layout, camera angle, and perspective
-- Do NOT repaint, remove, or alter ANY existing object
-- Do NOT hallucinate new space, expand walls, or clear surfaces
-- If you are unsure whether something changed size — keep it exactly as the original. When in doubt, preserve.
+- PIXEL-PERFECT FURNITURE PRESERVATION: Every existing piece of furniture (tables, TVs, sofas, beds, desks, chairs, shelves, dressers, cabinets, nightstands) must remain PIXEL-FOR-PIXEL identical — same exact dimensions, proportions, shape, color, texture, and position. Do NOT shrink, stretch, warp, resize, move, reshape, recolor, or alter ANY existing furniture even by 1%.
+- A sofa that takes up 40% of the frame must still take up exactly 40% of the frame. A TV that is rectangular must stay the exact same rectangle. Furniture legs, arms, cushions — every detail stays identical.
+- Same walls, floor, ceiling, objects, layout, camera angle, lens distortion, and perspective — match the original photograph exactly
+- Do NOT repaint, remove, or alter ANY existing object or surface
+- Do NOT hallucinate new space, expand walls, clear surfaces, or change room geometry
+- If you are unsure whether something changed — keep it exactly as the original. When in doubt, preserve the original pixel data.
 
 ADD these items at their specified locations:
 ${itemList}
@@ -97,7 +98,7 @@ ATMOSPHERE IS EVERYTHING — this is what separates a styled room from a Photosh
       })
       .join("\n");
 
-    const imagenPrompt = `Edit this room photo to add new items while keeping every existing piece of furniture the exact same size, shape, position, and color. Do not move, resize, or remove anything already in the room.
+    const imagenPrompt = `Edit this room photo. CRITICAL: Every existing piece of furniture must remain PIXEL-IDENTICAL — exact same size, shape, proportions, position, and color. Do NOT shrink, stretch, warp, resize, move, or alter any existing furniture or object. Only ADD the new items listed below.
 
 Add these items:
 ${imagenItemList}
@@ -107,7 +108,7 @@ Each new item must look realistic — correct perspective, scale, soft shadows, 
 
     // OpenAI gpt-image-1.5 — full cinematic transformation
     const openaiPrompt = `${basePrompt}
-- Every existing piece of furniture must remain the EXACT same size, shape, position, and color — do NOT resize, reshape, stretch, or reposition any existing object
+- FINAL REMINDER: Every existing piece of furniture must be PIXEL-IDENTICAL to the input photo — same size, shape, position, color, and proportions. If ANY furniture looks different in size or shape from the original, the result is a failure. Do NOT resize, reshape, stretch, warp, or reposition any existing object.
 ${hasLighting ? "- Lighting items are ON — show realistic warm light pools, glow on nearby surfaces, and soft ambient contribution to the room's overall illumination. The room should feel noticeably warmer and moodier because of these light sources." : "- Maintain the room's existing light direction."}
 
 THE "AFTER" PHOTO FEEL:

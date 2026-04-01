@@ -652,7 +652,7 @@ export default function Home() {
       {/* ── Sticky Header ── */}
       <header className="sticky top-0 z-50 backdrop-blur-md border-b border-accent-100/50 h-12 flex items-center px-4 sm:px-6" style={{ backgroundColor: 'rgba(253, 248, 244, 0.85)' }}>
         <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <button onClick={() => { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex items-center gap-2 cursor-pointer">
             <DoodleBear className="w-6 h-6" />
             <span
               className="text-base font-bold bg-clip-text text-transparent"
@@ -660,7 +660,7 @@ export default function Home() {
             >
               Roomify
             </span>
-          </div>
+          </button>
           <div className="flex items-center gap-1.5">
             {user && (
               <>
