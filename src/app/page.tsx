@@ -183,41 +183,47 @@ export default function Home() {
     [],
   );
 
+  // Download state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadDone, setDownloadDone] = useState(false);
+
   // Social sharing — creates a shareable link with OG metadata
   const [isSharing, setIsSharing] = useState(false);
-  const handleShare = useCallback(async () => {
-    if (!result) return;
+  const handleShare = useCallback(async (): Promise<boolean> => {
+    if (!result) return false;
     setIsSharing(true);
     try {
       const res = await fetch("/api/share-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          afterImageUrl: styledImageUrl || null,
           styleDirection: result.style_direction,
-          totalCost: result.total_estimated_cost,
-          itemCount: result.items?.length ?? 0,
           analysisId: currentAnalysisId.current,
         }),
       });
 
-      if (res.ok) {
-        const { shareUrl, title } = await res.json();
-        const shareText = `Check out my AI room makeover! ${result.items?.length ?? 0} items for ${localeConfig.currencySymbol}${result.total_estimated_cost ?? 0}.`;
-
-        if (navigator.share) {
-          await navigator.share({ title, text: shareText, url: shareUrl });
-        } else {
-          await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
-          // Brief visual feedback would be handled by the button state
-        }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("Share failed:", body.error);
+        return false;
       }
+
+      const { shareUrl, title } = await res.json();
+      const shareText = `Check out my AI room makeover! ${result.items?.length ?? 0} items for ${localeConfig.currencySymbol}${result.total_estimated_cost ?? 0}.`;
+
+      if (navigator.share) {
+        await navigator.share({ title, text: shareText, url: shareUrl });
+      } else {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+      }
+      return true;
     } catch {
       // User cancelled or share failed
+      return false;
     } finally {
       setIsSharing(false);
     }
-  }, [result, styledImageUrl]);
+  }, [result, localeConfig.currencySymbol]);
 
   const onImageSelected = useCallback((f: File, url: string) => {
     setFile(f);
@@ -1072,18 +1078,39 @@ export default function Home() {
                 {/* Download + Retry actions */}
                 <div className="flex justify-center gap-2">
                   <button
-                    onClick={() => {
-                      const link = document.createElement("a");
-                      link.href = styledImageUrl;
-                      link.download = "roomify-makeover.jpg";
-                      link.click();
+                    onClick={async () => {
+                      setIsDownloading(true);
+                      try {
+                        const res = await fetch(styledImageUrl!);
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = "roomify-makeover.png";
+                        link.click();
+                        URL.revokeObjectURL(url);
+                        setDownloadDone(true);
+                        setTimeout(() => setDownloadDone(false), 2000);
+                      } catch {
+                        window.open(styledImageUrl!, "_blank");
+                      } finally {
+                        setIsDownloading(false);
+                      }
                     }}
-                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-txt-muted hover:text-accent-500 transition-colors px-3 py-1.5 rounded-full border border-accent-100 hover:border-accent-300"
+                    disabled={isDownloading}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-txt-muted hover:text-accent-500 transition-colors px-3 py-1.5 rounded-full border border-accent-100 hover:border-accent-300 disabled:opacity-50"
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download Image
+                    {isDownloading ? (
+                      <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    )}
+                    {isDownloading ? "Saving..." : downloadDone ? "Saved!" : "Download Image"}
                   </button>
                   <button
                     onClick={regenerateWithGemini}
@@ -1100,7 +1127,7 @@ export default function Home() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     )}
-                    {isGeneratingImage ? "Regenerating..." : "Not right? Retry with Gemini"}
+                    {isGeneratingImage ? "Regenerating..." : "Room look off? Retry for a closer match"}
                   </button>
                 </div>
               </div>

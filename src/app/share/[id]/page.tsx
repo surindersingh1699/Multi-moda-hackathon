@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const analysis = share.analyses as { result: { style_direction?: string; total_estimated_cost?: number; items?: unknown[] } } | null;
   const title = share.title || "My Room Makeover — Roomify";
   const description = analysis?.result
-    ? `${analysis.result.items?.length ?? 0} items for $${analysis.result.total_estimated_cost ?? 0} — ${analysis.result.style_direction?.slice(0, 100) ?? ""}`
+    ? `${analysis.result.items?.length ?? 0} items for ~${analysis.result.total_estimated_cost ?? 0} — ${analysis.result.style_direction?.slice(0, 100) ?? ""}`
     : "Check out my AI room makeover!";
 
   return {
@@ -93,7 +93,7 @@ export default async function SharePage({ params }: Props) {
           </h1>
           {result && (
             <p className="text-sm" style={{ color: "#6B5347" }}>
-              {result.items?.length ?? 0} items for ${result.total_estimated_cost ?? 0}
+              {result.items?.length ?? 0} items &middot; ~{result.total_estimated_cost ?? 0} estimated
             </p>
           )}
         </div>
@@ -147,7 +147,7 @@ export default async function SharePage({ params }: Props) {
             {result.items.map((item, i) => (
               <div key={i} className="flex items-center justify-between text-sm">
                 <span style={{ color: "#2C1810" }}>{item.name}</span>
-                <span className="font-bold" style={{ color: "#B84E20" }}>${item.estimated_price}</span>
+                <span className="font-bold" style={{ color: "#B84E20" }}>~{item.estimated_price}</span>
               </div>
             ))}
           </div>

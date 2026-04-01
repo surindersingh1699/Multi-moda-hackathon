@@ -11,26 +11,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { beforeImageUrl, afterImageUrl, styleDirection, totalCost, itemCount, analysisId } =
-    await request.json();
+  const { styleDirection, analysisId } = await request.json();
 
-  if (!afterImageUrl) {
-    return NextResponse.json({ error: "afterImageUrl required" }, { status: 400 });
+  if (!analysisId) {
+    return NextResponse.json({ error: "analysisId required" }, { status: 400 });
   }
 
   try {
-    // Fetch the after image and create a share entry
-    // For now, use the styled image URL directly as the share image
-    // In production, you could composite before/after with Sharp
-    const shareId = crypto.randomUUID().slice(0, 16);
+    // Fetch the analysis to get the styled image URL
+    const { data: analysis, error: fetchErr } = await supabase
+      .from("analyses")
+      .select("styled_image_url")
+      .eq("id", analysisId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (fetchErr || !analysis) {
+      return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
+    }
+
+    const imageUrl = analysis.styled_image_url;
     const title = `My Room Makeover — ${styleDirection?.slice(0, 50) || "Roomify"}`;
 
     const { data: share, error: insertErr } = await supabase
       .from("shares")
       .insert({
-        analysis_id: analysisId || null,
+        analysis_id: analysisId,
         user_id: user.id,
-        image_path: afterImageUrl,
+        image_path: imageUrl,
         title,
       })
       .select("id")
@@ -46,7 +54,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       shareId: share.id,
       shareUrl,
-      imageUrl: afterImageUrl,
+      imageUrl,
       title,
     });
   } catch (e) {

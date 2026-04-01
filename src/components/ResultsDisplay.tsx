@@ -11,7 +11,7 @@ interface Props {
   /** Set of favorited item names (lowercase) for instant UI feedback */
   favoriteNames?: Set<string>;
   onToggleFavorite?: (item: StylingItem, match?: ProductMatch) => void;
-  onShare?: () => void;
+  onShare?: () => Promise<boolean>;
   isSharing?: boolean;
   currencySymbol?: string;
   fallbackStores?: FallbackStore[];
@@ -73,7 +73,11 @@ export default function ResultsDisplay({
   const handleShare = async () => {
     // Use the enhanced share handler if provided (for image sharing)
     if (onShare) {
-      onShare();
+      const success = await onShare();
+      if (success) {
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      }
       return;
     }
     const text = `Check out my AI room makeover plan from Roomify! ${items.length} items for ${currencySymbol}${totalCost}.`;
