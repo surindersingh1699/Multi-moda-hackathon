@@ -9,30 +9,30 @@ export interface ImageGenResult {
 
 /**
  * Generate a styled room image using a fallback chain:
- * Imagen 3 (Vertex AI) → gpt-image-1.5 (OpenAI)
+ * gpt-image-1.5 (OpenAI) → Imagen 3 (Vertex AI)
  */
 export async function generateStyledRoom(
   imageBuffer: Buffer,
   prompt: string,
   size: "1024x1024" | "1536x1024" | "1024x1536"
 ): Promise<ImageGenResult> {
-  // Try Imagen 3 first (Vertex AI Express)
-  if (process.env.VERTEX_AI_KEY) {
+  // Try gpt-image-1.5 first (OpenAI)
+  if (process.env.OPENAI_API_KEY) {
     try {
-      const result = await generateWithImagen3(imageBuffer, prompt);
-      if (result) return result;
+      return await generateWithGptImage15(imageBuffer, prompt, size);
     } catch (e) {
-      console.warn("Imagen 3 failed, trying next provider:", e);
+      console.warn("gpt-image-1.5 failed, trying next provider:", e);
     }
   }
 
-  // Fall back to gpt-image-1.5 (OpenAI)
-  if (process.env.OPENAI_API_KEY) {
-    return await generateWithGptImage15(imageBuffer, prompt, size);
+  // Fall back to Imagen 3 (Vertex AI)
+  if (process.env.VERTEX_AI_KEY) {
+    const result = await generateWithImagen3(imageBuffer, prompt);
+    if (result) return result;
   }
 
   throw new Error(
-    "No image generation provider available. Set VERTEX_AI_KEY or OPENAI_API_KEY."
+    "No image generation provider available. Set OPENAI_API_KEY or VERTEX_AI_KEY."
   );
 }
 
