@@ -318,7 +318,7 @@ function ItemCard({
 
   return (
     <div
-      className="animate-slideUp flex gap-4 rounded-2xl bg-bg-card border border-accent-100/50 p-4 transition-all duration-300 hover:-translate-y-0.5"
+      className="animate-slideUp flex gap-3 sm:gap-4 rounded-2xl bg-bg-card border border-accent-100/50 p-3 sm:p-4 overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
       style={{
         animationDelay: `${0.3 + index * 0.08}s`,
         boxShadow: '0 1px 3px rgba(44,24,16,0.06)',

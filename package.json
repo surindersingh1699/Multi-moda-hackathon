@@ -16,6 +16,7 @@
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.0",
     "canvas-confetti": "^1.9.4",
+    "heic-convert": "^2.1.0",
     "heic2any": "^0.0.4",
     "next": "16.2.1",
     "openai": "^6.33.0",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/heic-convert": "^2.1.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

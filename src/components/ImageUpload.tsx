@@ -280,7 +280,8 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+          accept="image/*"
+          capture="environment"
           onChange={onFileChange}
           className="hidden"
           disabled={disabled}
