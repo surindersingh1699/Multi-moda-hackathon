@@ -63,7 +63,7 @@ async function generateWithGeminiFlashImage(
   const base64Data = imageBuffer.toString("base64");
 
   const chat = genai.chats.create({
-    model: "gemini-2.5-flash-preview-image",
+    model: "gemini-2.5-flash-image",
     config: {
       responseModalities: [Modality.IMAGE, Modality.TEXT],
     },
