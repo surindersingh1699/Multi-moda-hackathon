@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { useLocale } from "@/lib/locale";
 import { fetchAnalyses, getSignedImageUrl } from "@/lib/supabase/db";
 import type { AnalysisRow } from "@/lib/supabase/db";
 
@@ -13,6 +14,7 @@ interface Props {
 
 export default function CompareView({ open, onClose }: Props) {
   const { user } = useAuth();
+  const { currencySymbol } = useLocale();
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -175,7 +177,7 @@ export default function CompareView({ open, onClose }: Props) {
                             {row.result?.style_direction?.slice(0, 50) || "Room Analysis"}
                           </p>
                           <p className="text-[10px] text-txt-muted">
-                            {row.result?.items?.length ?? 0} items &middot; ${row.result?.total_estimated_cost ?? 0}
+                            {row.result?.items?.length ?? 0} items &middot; {currencySymbol}{row.result?.total_estimated_cost ?? 0}
                             {row.vibe && ` &middot; ${row.vibe}`}
                           </p>
                         </div>
@@ -227,7 +229,7 @@ export default function CompareView({ open, onClose }: Props) {
                     {/* Stats */}
                     <div className="flex items-center gap-2 text-[10px]">
                       <span className="font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-full">
-                        ${row.result?.total_estimated_cost ?? 0}
+                        {currencySymbol}{row.result?.total_estimated_cost ?? 0}
                       </span>
                       <span className="text-txt-muted">
                         {row.result?.items?.length ?? 0} items
@@ -244,7 +246,7 @@ export default function CompareView({ open, onClose }: Props) {
                       {(row.result?.items ?? []).map((item, i) => (
                         <div key={i} className="flex items-center justify-between text-[10px] px-1">
                           <span className="text-txt-secondary truncate">{item.name}</span>
-                          <span className="text-txt-muted shrink-0 ml-2">${item.estimated_price}</span>
+                          <span className="text-txt-muted shrink-0 ml-2">{currencySymbol}{item.estimated_price}</span>
                         </div>
                       ))}
                     </div>
@@ -270,14 +272,14 @@ export default function CompareView({ open, onClose }: Props) {
                         <span className="text-txt-primary truncate">{item.name}</span>
                       </div>
                       <span className="font-bold text-accent-600 shrink-0 ml-2">
-                        ${item.estimated_price}
+                        {currencySymbol}{item.estimated_price}
                       </span>
                     </div>
                   ))}
                 </div>
                 <div className="mt-3 pt-3 border-t border-accent-100 flex items-center justify-between">
                   <span className="text-xs font-semibold text-txt-muted">Combined Total</span>
-                  <span className="text-lg font-bold text-txt-primary">${combinedTotal}</span>
+                  <span className="text-lg font-bold text-txt-primary">{currencySymbol}{combinedTotal}</span>
                 </div>
               </div>
             </div>

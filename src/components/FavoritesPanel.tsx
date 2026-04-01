@@ -118,7 +118,7 @@ export default function FavoritesPanel({ open, onClose }: Props) {
   );
 }
 
-function FavoriteCard({ fav, onRemove }: { fav: FavoriteRow; onRemove: () => void }) {
+function FavoriteCard({ fav, onRemove, currencySymbol = "$", fallbackSearchUrl }: { fav: FavoriteRow; onRemove: () => void; currencySymbol?: string; fallbackSearchUrl?: (q: string) => string }) {
   const price = fav.real_price ?? fav.estimated_price ?? 0;
   const searchQuery = fav.search_query || fav.item_name;
 
@@ -147,7 +147,7 @@ function FavoriteCard({ fav, onRemove }: { fav: FavoriteRow; onRemove: () => voi
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-sm font-semibold text-txt-primary truncate">{fav.item_name}</h3>
             <span className="text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg shrink-0">
-              ${price}
+              {currencySymbol}{price}
             </span>
           </div>
 
@@ -181,7 +181,7 @@ function FavoriteCard({ fav, onRemove }: { fav: FavoriteRow; onRemove: () => voi
               </a>
             ) : (
               <a
-                href={`https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`}
+                href={fallbackSearchUrl ? fallbackSearchUrl(searchQuery) : `https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-200 px-2.5 py-0.5 text-[10px] font-semibold text-accent-600 hover:bg-accent-100 transition-colors"

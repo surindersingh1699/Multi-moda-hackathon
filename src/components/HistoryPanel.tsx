@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { useLocale } from "@/lib/locale";
 import { fetchAnalyses, archiveAnalysis, getSignedImageUrl } from "@/lib/supabase/db";
 import type { AnalysisRow } from "@/lib/supabase/db";
 import type { StylingResult, ProductMatch } from "@/lib/schema";
@@ -22,6 +23,7 @@ interface Props {
 
 export default function HistoryPanel({ open, onClose, onLoadAnalysis }: Props) {
   const { user } = useAuth();
+  const locale = useLocale();
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
@@ -116,6 +118,8 @@ export default function HistoryPanel({ open, onClose, onLoadAnalysis }: Props) {
                 imageUrl={imageUrls[row.id]}
                 onLoad={() => handleLoad(row)}
                 onArchive={() => handleArchive(row.id)}
+                currencySymbol={locale.currencySymbol}
+                dateLocale={locale.dateLocale}
               />
             ))
           )}
@@ -130,14 +134,18 @@ function HistoryCard({
   imageUrl,
   onLoad,
   onArchive,
+  currencySymbol = "$",
+  dateLocale = "en-US",
 }: {
   row: AnalysisRow;
   imageUrl?: string;
   onLoad: () => void;
   onArchive: () => void;
+  currencySymbol?: string;
+  dateLocale?: string;
 }) {
   const date = new Date(row.created_at);
-  const formatted = date.toLocaleDateString("en-US", {
+  const formatted = date.toLocaleDateString(dateLocale, {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -178,7 +186,7 @@ function HistoryCard({
               {itemCount} items
             </span>
             <span className="text-[10px] font-medium text-txt-muted">
-              ${totalCost}
+              {currencySymbol}{totalCost}
             </span>
             {row.vibe && (
               <span className="text-[10px] font-medium text-txt-muted bg-bg-secondary px-2 py-0.5 rounded-full">
