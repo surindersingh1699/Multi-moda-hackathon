@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // Rate limit: 10 requests per minute per IP
+  const rl = rateLimit(request, { maxRequests: 10, windowMs: 60_000 });
+  if (rl) return rl;
   const supabase = await createClient();
   const {
     data: { user },

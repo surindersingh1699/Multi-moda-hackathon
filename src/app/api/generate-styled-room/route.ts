@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { optimizeForEdit, parseDataUrl } from "@/lib/image";
 import { generateStyledRoomWithProvider } from "@/lib/image-gen";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/rate-limit";
 
 interface ItemInput {
   name: string;
@@ -13,6 +14,10 @@ interface ItemInput {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 10 requests per minute per IP
+    const rl = rateLimit(req, { maxRequests: 10, windowMs: 60_000 });
+    if (rl) return rl;
+
     // Auth check — prevent unauthenticated credit burn
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -166,7 +171,8 @@ This is the photo that makes someone say "I need to transform my room like this.
           await supabase
             .from("analyses")
             .update({ styled_image_url: styledStorageUrl })
-            .eq("id", analysisId);
+            .eq("id", analysisId)
+            .eq("user_id", user.id);
         } else {
           console.warn("Failed to upload styled image to storage:", uploadErr);
         }

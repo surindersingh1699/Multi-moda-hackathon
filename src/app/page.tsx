@@ -413,7 +413,7 @@ export default function Home() {
           // Persist product matches to Supabase
           if (currentAnalysisId.current) {
             const supabase = createClient();
-            updateAnalysisProducts(supabase, currentAnalysisId.current, data.matches);
+            updateAnalysisProducts(supabase, currentAnalysisId.current, data.matches, user!.id);
           }
           return data.matches;
         } else {

@@ -3,11 +3,16 @@ import type { StylingItem, ProductMatch, ProductSearchResult } from "@/lib/schem
 import { MOCK_PRODUCT_MATCHES } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
 import { getLocaleConfig } from "@/lib/locale-config";
+import { rateLimit } from "@/lib/rate-limit";
 
 const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/amazon/search";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 20 requests per minute per IP
+    const rl = rateLimit(req, { maxRequests: 20, windowMs: 60_000 });
+    if (rl) return rl;
+
     // Auth check — prevent unauthenticated credit burn
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();

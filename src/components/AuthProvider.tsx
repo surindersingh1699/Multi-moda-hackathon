@@ -4,11 +4,6 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 import { createClient } from "@/lib/supabase/client";
 import type { User, SupabaseClient } from "@supabase/supabase-js";
 
-const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -37,14 +32,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(supabaseConfigured);
   const [usageCount, setUsageCount] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = useMemo<SupabaseClient | null>(
     () => (supabaseConfigured ? createClient() : null),
     []
   );
 
-  const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
-
   const userId = user?.id;
+
+  // Fetch admin status from server (avoids leaking admin emails in client bundle)
+  useEffect(() => {
+    if (!userId) { setIsAdmin(false); return; }
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => setIsAdmin(!!data.isAdmin))
+      .catch(() => setIsAdmin(false));
+  }, [userId]);
+
   const refreshUsage = useCallback(async () => {
     if (!userId || !supabase || isAdmin) {
       setUsageCount(null);

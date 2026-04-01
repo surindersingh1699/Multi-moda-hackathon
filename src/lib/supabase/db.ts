@@ -107,22 +107,26 @@ export async function updateAnalysisStyledImage(
   supabase: SupabaseClient,
   analysisId: string,
   styledImageUrl: string,
+  userId: string,
 ) {
   await supabase
     .from("analyses")
     .update({ styled_image_url: styledImageUrl })
-    .eq("id", analysisId);
+    .eq("id", analysisId)
+    .eq("user_id", userId);
 }
 
 export async function updateAnalysisProducts(
   supabase: SupabaseClient,
   analysisId: string,
   matches: ProductMatch[],
+  userId: string,
 ) {
   await supabase
     .from("analyses")
     .update({ product_matches: matches })
-    .eq("id", analysisId);
+    .eq("id", analysisId)
+    .eq("user_id", userId);
 }
 
 export async function fetchAnalyses(

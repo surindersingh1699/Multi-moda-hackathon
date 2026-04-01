@@ -14,6 +14,7 @@ import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
 import { optimizeForVision } from "@/lib/image";
 import { getLocaleConfig } from "@/lib/locale-config";
+import { rateLimit } from "@/lib/rate-limit";
 
 const MAX_USES = 5;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
@@ -25,6 +26,10 @@ const MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 10 requests per minute per IP
+    const rl = rateLimit(req, { maxRequests: 10, windowMs: 60_000 });
+    if (rl) return rl;
+
     const contentLength = req.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_BYTES) {
       return jsonResponse(
