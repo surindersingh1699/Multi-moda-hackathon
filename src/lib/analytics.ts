@@ -21,13 +21,16 @@ export function initAnalytics() {
     person_profiles: "identified_only",
     capture_pageview: false,
     capture_pageleave: true,
-    __add_sentry_integration: true,
     loaded: (ph) => {
       if (process.env.NODE_ENV === "development") {
         ph.debug();
       }
     },
   });
+
+  // Link PostHog sessions with Sentry errors
+  // @ts-expect-error — undocumented but supported PostHog property
+  posthog.config.__add_sentry_integration = true;
 
   initialized = true;
 }
