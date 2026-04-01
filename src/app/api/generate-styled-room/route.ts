@@ -63,45 +63,63 @@ export async function POST(req: NextRequest) {
 
     const hasLighting = items.some((i) => i.category.toLowerCase().includes("light"));
 
-    // Base compositing instructions shared by both providers
-    const basePrompt = `This is a real photograph of a room. Your job is a precise photo-edit: composite new items into the existing photo so the result looks like an untouched photograph.
+    // Base instructions shared by both providers
+    const basePrompt = `You are a professional room stylist photographing a transformation. This is a real photo of a room. You are creating the "AFTER" shot — same room, same furniture, but with new items that completely shift the atmosphere.
 
-PRESERVE EVERYTHING — this is non-negotiable:
-- Same walls, floor, ceiling, furniture, objects, layout, camera angle, and perspective
-- Do NOT move, resize, repaint, remove, or alter ANY existing object
+PRESERVE THE ROOM — this is the #1 rule, above everything else:
+- Every existing piece of furniture (tables, TVs, sofas, beds, desks, chairs, shelves, dressers) must remain the EXACT same size, shape, position, proportion, and color. A table that is 3 feet wide in the original must be 3 feet wide in the output. Do NOT shrink, stretch, warp, resize, move, or reshape ANY existing furniture.
+- Same walls, floor, ceiling, objects, layout, camera angle, and perspective
+- Do NOT repaint, remove, or alter ANY existing object
 - Do NOT hallucinate new space, expand walls, or clear surfaces
+- If you are unsure whether something changed size — keep it exactly as the original. When in doubt, preserve.
 
-ADD ONLY these items at their specified locations:
+ADD these items at their specified locations:
 ${itemList}
-${styleDirection ? `\nStyle direction: ${styleDirection} — let this guide the items' look, NOT the room itself.` : ""}
+${styleDirection ? `\nTransformation direction: ${styleDirection}` : ""}
 
-Compositing rules:
-- Each item must match the room's existing perspective, scale, and depth of field
-- Items cast soft shadows consistent with the room's light source direction
-- Items interact realistically with surfaces (a vase sits ON a table, a throw drapes OVER an arm)
-- If an item cannot fit naturally at its location without overlapping existing objects, omit it — fewer items is better than a broken photo
-- CRITICAL: Add ONLY the exact products listed — no extra accessories, no styling additions. If the list says "floating shelf", render an empty shelf — do NOT add vases, books, or decor on it. The user can only buy the listed products, so the image must show exactly what they will receive.`;
+STYLING RULES (not just compositing — this is a transformation):
+- Each item must match the room's perspective, scale, and depth of field
+- Items interact realistically with surfaces (a throw drapes naturally OVER an arm, a vase sits ON a table with a contact shadow)
+- If an item cannot fit naturally without overlapping existing objects, omit it
+- CRITICAL: Add ONLY the exact products listed — no extra accessories. If the list says "floating shelf", render an empty shelf — no bonus vases or books on it.
 
-    // Imagen 3 — strict preservation, no atmosphere changes
-    const imagenPrompt = `${basePrompt}
-- Same lighting direction, color temperature, and shadow patterns
-${hasLighting ? "- Since lighting items are included, you may subtly warm the ambient light near those items." : ""}
+ATMOSPHERE IS EVERYTHING — this is what separates a styled room from a Photoshop job:
+- NEW LIGHTING ITEMS MUST ACTUALLY LIGHT THE ROOM: If a lamp, candle, or LED strip is in the list, it should be ON and casting realistic warm light onto nearby surfaces. Show the pool of warm light on the wall behind a lamp. Show candle glow on the tabletop. This is the #1 thing that transforms a room's feel.
+- SHADOWS TELL THE STORY: Every new item casts soft, directional shadows consistent with the room's light sources. If a new lamp is added, it becomes an additional light source that creates its own shadows and warm zones.
+- TEXTURE HAS DEPTH: Throws should look soft and draped with visible texture. Pillows should have dimension. Woven items should catch light on their ridges. Don't render flat color blocks — render materials.
+- THE ROOM SHOULD FEEL WARMER AND MORE INVITING: The overall image should subtly shift toward warmth and coziness — not by adding a filter, but because warm lighting items are actually illuminating the space and soft textures are absorbing the harshness.`;
 
-The final image must be indistinguishable from a real photograph of this same room with these items naturally present.`;
+    // Imagen 3 — short, action-first prompt (Imagen works best with concise directives)
+    const imagenItemList = items
+      .map((item, i) => {
+        const name = item.product_title || item.name;
+        return `${i + 1}. Add a ${name} ${item.placement}`;
+      })
+      .join("\n");
 
-    // OpenAI gpt-image-1.5 — natural but polished, strict size preservation
+    const imagenPrompt = `Edit this room photo to add new items while keeping every existing piece of furniture the exact same size, shape, position, and color. Do not move, resize, or remove anything already in the room.
+
+Add these items:
+${imagenItemList}
+${styleDirection ? `\nStyle: ${styleDirection}` : ""}
+
+Each new item must look realistic — correct perspective, scale, soft shadows, and natural surface interaction.${hasLighting ? " Lamps and candles should be turned ON, casting warm light on nearby walls and surfaces." : ""} The result should look like an untouched professional interior photograph.`;
+
+    // OpenAI gpt-image-1.5 — full cinematic transformation
     const openaiPrompt = `${basePrompt}
-- Same lighting direction, color temperature, and shadow patterns
 - Every existing piece of furniture must remain the EXACT same size, shape, position, and color — do NOT resize, reshape, stretch, or reposition any existing object
-${hasLighting ? "- Since lighting items are included, you may subtly warm the ambient light near those items." : ""}
+${hasLighting ? "- Lighting items are ON — show realistic warm light pools, glow on nearby surfaces, and soft ambient contribution to the room's overall illumination. The room should feel noticeably warmer and moodier because of these light sources." : "- Maintain the room's existing light direction."}
 
-PHOTO POLISH — keep it natural, just slightly elevated:
-- The room should look like a cleaner, slightly better-lit version of itself — as if someone tidied up and the natural light happened to be really good that day
-- You may subtly warm the overall tone and gently lift the contrast so the photo feels inviting rather than flat
-- Keep it realistic and natural — it should never look filtered, processed, or AI-generated
-- The new items should blend in so well that the photo looks like they were always there
+THE "AFTER" PHOTO FEEL:
+- This should look like a TikTok room transformation — same room, but it FEELS completely different
+- The room should feel warmer, more layered, more intentional — like someone who really cares about their space lives here
+- Warm up the color temperature subtly — shift toward golden/amber tones rather than cool/clinical
+- Lift the contrast gently so the room has depth — dark corners feel moody, lit areas feel warm
+- The new items should look like they've ALWAYS been there — not freshly placed, but lived-with
+- It should never look filtered or AI-generated — it should look like the room on its absolute best day, with perfect natural light pouring in
 
-The final image must be indistinguishable from a real photograph of this same room with these items naturally present.`;
+This is the photo that makes someone say "I need to transform my room like this."`;
+
 
     const size = pickSize(optimizedBuffer);
 

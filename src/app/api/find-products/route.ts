@@ -58,6 +58,42 @@ async function searchAllItems(items: StylingItem[], amazonTld: string): Promise<
   return results.filter((m): m is ProductMatch => m !== null);
 }
 
+/** Score an Amazon result by quality signals, not just price */
+function scoreResult(r: ScraperApiResult, estimatedPrice: number): number {
+  let score = 0;
+
+  // Price: must exist and be reasonable (within 2.5x estimated)
+  if (typeof r.price !== "number" || r.price <= 0) return -1;
+  if (r.price > estimatedPrice * 2.5) return -1;
+
+  // Rating quality (0-50 points): strong ratings matter most
+  const stars = typeof r.stars === "number" ? r.stars : 0;
+  if (stars >= 4.5) score += 50;
+  else if (stars >= 4.0) score += 40;
+  else if (stars >= 3.5) score += 25;
+  else if (stars > 0) score += 10;
+  // No rating = 0 points (unknown quality, not penalized hard)
+
+  // Review volume (0-25 points): social proof, but diminishing returns
+  // log scale so 200 reviews scores well even against 10k review mass-market items
+  const reviews = typeof r.total_reviews === "number" ? r.total_reviews : 0;
+  if (reviews > 0) score += Math.min(25, Math.round(Math.log10(reviews + 1) * 8));
+
+  // Badge bonus (0-15 points): Amazon-curated quality signals
+  if (r.is_amazon_choice) score += 15;
+  else if (r.is_best_seller) score += 10;
+
+  // Prime (0-5 points): faster delivery, usually better quality control
+  if (r.has_prime) score += 5;
+
+  // Price-to-value (0-10 points): closer to estimated = better fit
+  const priceRatio = r.price / estimatedPrice;
+  if (priceRatio >= 0.5 && priceRatio <= 1.5) score += 10;
+  else if (priceRatio >= 0.3 && priceRatio <= 2.0) score += 5;
+
+  return score;
+}
+
 /** Search Amazon via ScraperAPI structured endpoint */
 async function searchAmazon(item: StylingItem, amazonTld: string): Promise<ProductMatch | null> {
   try {
@@ -76,27 +112,36 @@ async function searchAmazon(item: StylingItem, amazonTld: string): Promise<Produ
     const results = data.results;
     if (!Array.isArray(results) || results.length === 0) return null;
 
-    // Pick best: within 2x budget with price > any with price > first result
-    const maxPrice = item.estimated_price * 2;
-    const match =
-      results.find(
-        (r: ScraperApiResult) =>
-          typeof r.price === "number" && r.price > 0 && r.price <= maxPrice,
-      ) ??
-      results.find((r: ScraperApiResult) => typeof r.price === "number" && r.price > 0) ??
-      results[0];
+    // Score all candidates and pick the best quality product
+    let bestMatch: ScraperApiResult = results[0];
+    let bestScore = -Infinity;
 
-    const asin = extractAsin(match.url);
+    for (const r of results as ScraperApiResult[]) {
+      const s = scoreResult(r, item.estimated_price);
+      if (s > bestScore) {
+        bestScore = s;
+        bestMatch = r;
+      }
+    }
+
+    // If no scored result was viable, fall back to first with a price
+    if (bestScore < 0) {
+      bestMatch =
+        results.find((r: ScraperApiResult) => typeof r.price === "number" && r.price > 0) ??
+        results[0];
+    }
+
+    const asin = extractAsin(bestMatch.url);
 
     return {
       item_name: item.name,
-      product_title: String(match.name || ""),
+      product_title: String(bestMatch.name || ""),
       product_url: asin
         ? `https://www.amazon.${amazonTld}/dp/${asin}`
-        : String(match.url || ""),
-      real_price: typeof match.price === "number" ? match.price : null,
+        : String(bestMatch.url || ""),
+      real_price: typeof bestMatch.price === "number" ? bestMatch.price : null,
       store: "Amazon",
-      thumbnail: typeof match.image === "string" ? match.image : null,
+      thumbnail: typeof bestMatch.image === "string" ? bestMatch.image : null,
       asin,
     };
   } catch {

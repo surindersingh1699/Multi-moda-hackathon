@@ -28,10 +28,12 @@ export function validateResult(
     return { ok: false, error: `Expected 4-6 items, got ${r.items.length}` };
   }
 
-  if (r.total_estimated_cost > budget) {
+  // Budget is a suggestion — allow up to 20% over
+  const budgetCeiling = budget * 1.2;
+  if (r.total_estimated_cost > budgetCeiling) {
     return {
       ok: false,
-      error: `Total cost $${r.total_estimated_cost} exceeds $${budget} budget`,
+      error: `Total cost $${r.total_estimated_cost} exceeds $${budget} budget ceiling ($${budgetCeiling})`,
     };
   }
 

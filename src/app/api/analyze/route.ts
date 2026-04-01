@@ -145,9 +145,21 @@ export async function POST(req: NextRequest) {
             console.warn("Validation failed, retrying Step B:", validated.error);
             const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with the correct number of items, total under ${locale.currencySymbol}${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
 
+            // finalResult is a StylingResult (has `items`), convert to CreativeResult shape (needs `ideas`)
+            const retryCreative: CreativeResult = {
+              room_reading: (finalResult as StylingResult).room_reading ?? "",
+              style_direction: (finalResult as StylingResult).style_direction ?? "",
+              ideas: ((finalResult as StylingResult).items ?? []).map((it) => ({
+                name: it.name,
+                category: it.category,
+                reason: it.reason,
+              })),
+              quick_wins: (finalResult as StylingResult).quick_wins ?? [],
+            };
+
             if (process.env.OPENAI_API_KEY) {
               const shoppingPrompt = buildShoppingPrompt(
-                finalResult as unknown as CreativeResult,
+                retryCreative,
                 budgetNum,
                 locale.currencySymbol,
                 locale.storeList
@@ -159,7 +171,7 @@ export async function POST(req: NextRequest) {
               validated = validateResult(retryResult, budgetNum);
             } else if (process.env.GOOGLE_API_KEY) {
               const shoppingPrompt = buildShoppingPrompt(
-                finalResult as unknown as CreativeResult,
+                retryCreative,
                 budgetNum,
                 locale.currencySymbol,
                 locale.storeList
