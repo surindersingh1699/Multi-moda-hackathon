@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import sharp from "sharp";
 import { GoogleGenAI, Modality, RawReferenceImage } from "@google/genai";
 
 export interface ImageGenResult {
@@ -8,30 +9,30 @@ export interface ImageGenResult {
 
 /**
  * Generate a styled room image using a fallback chain:
- * gpt-image-1.5 (OpenAI) → Imagen 3 (Vertex AI)
+ * Imagen 3 (Vertex AI) → gpt-image-1.5 (OpenAI)
  */
 export async function generateStyledRoom(
   imageBuffer: Buffer,
   prompt: string,
   size: "1024x1024" | "1536x1024" | "1024x1536"
 ): Promise<ImageGenResult> {
-  // Try gpt-image-1.5 first (OpenAI)
-  if (process.env.OPENAI_API_KEY) {
+  // Try Imagen 3 first (Vertex AI Express)
+  if (process.env.VERTEX_AI_KEY) {
     try {
-      return await generateWithGptImage15(imageBuffer, prompt, size);
+      const result = await generateWithImagen3(imageBuffer, prompt);
+      if (result) return result;
     } catch (e) {
-      console.warn("gpt-image-1.5 failed, trying next provider:", e);
+      console.warn("Imagen 3 failed, trying next provider:", e);
     }
   }
 
-  // Fall back to Imagen 3 (Vertex AI)
-  if (process.env.VERTEX_AI_KEY) {
-    const result = await generateWithImagen3(imageBuffer, prompt);
-    if (result) return result;
+  // Fall back to gpt-image-1.5 (OpenAI)
+  if (process.env.OPENAI_API_KEY) {
+    return await generateWithGptImage15(imageBuffer, prompt, size);
   }
 
   throw new Error(
-    "No image generation provider available. Set OPENAI_API_KEY or VERTEX_AI_KEY."
+    "No image generation provider available. Set VERTEX_AI_KEY or OPENAI_API_KEY."
   );
 }
 
@@ -135,6 +136,41 @@ async function generateWithImagen3(
   };
 }
 
+// ── Border mask for gpt-image-1.5 ─────────────────────────────────
+
+/**
+ * Generate a thin edge-lock mask for OpenAI images.edit.
+ * Only locks the outermost 3% pixel border to prevent structural collapse
+ * and edge warping, while leaving 94% of the image fully editable for
+ * creative decoration (walls, corners, floor edges, shelves, etc.).
+ * OpenAI mask semantics: alpha 0 = edit, alpha 255 = keep.
+ */
+async function generateBorderMask(imageBuffer: Buffer): Promise<Buffer> {
+  const meta = await sharp(imageBuffer).metadata();
+  const w = meta.width!;
+  const h = meta.height!;
+  const borderX = Math.round(w * 0.03);
+  const borderY = Math.round(h * 0.03);
+
+  // Inner editable region (transparent) — 94% of the image
+  const innerW = w - borderX * 2;
+  const innerH = h - borderY * 2;
+
+  // Thin opaque border (locked) with transparent center (editable)
+  return sharp({
+    create: { width: w, height: h, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+  })
+    .composite([{
+      input: await sharp({
+        create: { width: innerW, height: innerH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+      }).png().toBuffer(),
+      left: borderX,
+      top: borderY,
+    }])
+    .png()
+    .toBuffer();
+}
+
 // ── gpt-image-1.5 via OpenAI ──────────────────────────────────────
 
 async function generateWithGptImage15(
@@ -143,15 +179,26 @@ async function generateWithGptImage15(
   size: "1024x1024" | "1536x1024" | "1024x1536"
 ): Promise<ImageGenResult> {
   const openai = new OpenAI();
+
+  // Generate border-lock mask to prevent edge warping
+  const maskBuffer = await generateBorderMask(imageBuffer);
+
   const arrayBuffer = imageBuffer.buffer.slice(
     imageBuffer.byteOffset,
     imageBuffer.byteOffset + imageBuffer.byteLength
   ) as ArrayBuffer;
   const imageFile = new File([arrayBuffer], "room.png", { type: "image/png" });
 
+  const maskArrayBuffer = maskBuffer.buffer.slice(
+    maskBuffer.byteOffset,
+    maskBuffer.byteOffset + maskBuffer.byteLength
+  ) as ArrayBuffer;
+  const maskFile = new File([maskArrayBuffer], "mask.png", { type: "image/png" });
+
   const response = await openai.images.edit({
     model: "gpt-image-1.5",
     image: imageFile,
+    mask: maskFile,
     prompt,
     size,
     quality: "low",

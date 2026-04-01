@@ -61,22 +61,20 @@ export async function POST(req: NextRequest) {
       })
       .join("\n");
 
-    // Photo-editor prompt — structure-first, then add decor
-    const editPrompt = `CRITICAL: This is a photo editing task. The room structure must be IDENTICAL to the input image. Every wall, window, door, TV, screen, mirror, shelf, ceiling, floor, and piece of existing furniture must remain exactly as-is — same position, size, shape, and proportions. Do not move, remove, shrink, stretch, or reshape anything that already exists. If people or pets are visible, preserve them exactly.
+    const hasLighting = items.some((i) => i.category.toLowerCase().includes("light"));
 
-Your only job: place a few new decor items into the existing room. Nothing else changes.
-${styleDirection ? `\nStyle direction: ${styleDirection}` : ""}
+    // Positive-framing prompt — works better with all image gen models
+    const editPrompt = `This is a real room photo. Keep everything exactly as it is — same walls, floor, furniture, layout, perspective, and lighting.
 
-Items to place:
+Your only task: naturally add these specific small items into the existing room at the exact locations specified:
 ${itemList}
+${styleDirection ? `\nStyle hint: ${styleDirection}` : ""}
 
-Placement rules:
-- Only place items where there is real empty space — on bare surfaces, empty walls, or open floor areas.
-- If there is not enough room, skip items rather than forcing them in.
-- Never place anything on top of screens, TVs, windows, mirrors, or doors.
-- Keep realistic scale for every added item.
+Each item has a specific placement — follow it precisely. The items should look naturally integrated, matching the room's existing scale and perspective.
 
-Make the result photorealistic and attractive — the same room, just with a few well-chosen additions.`;
+${hasLighting ? "Since lighting items are included, you may subtly warm the overall lighting tone." : "Keep the existing lighting and color tone exactly as-is."}
+
+The result should look like a real photo of the same room with just these small additions visible. Everything else stays identical.`;
 
 
     const size = pickSize(optimizedBuffer);
@@ -200,3 +198,4 @@ function pickSize(
   }
   return "1024x1024";
 }
+
