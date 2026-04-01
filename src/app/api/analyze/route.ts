@@ -13,7 +13,7 @@ import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
 import { optimizeForVision } from "@/lib/image";
-import { getLocaleConfig } from "@/lib/locale";
+import { getLocaleConfig } from "@/lib/locale-config";
 
 const MAX_USES = 3;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { StylingItem, ProductMatch, ProductSearchResult } from "@/lib/schema";
 import { MOCK_PRODUCT_MATCHES } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
-import { getLocaleConfig } from "@/lib/locale";
+import { getLocaleConfig } from "@/lib/locale-config";
 
 const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/amazon/search";
 

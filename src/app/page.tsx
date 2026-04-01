@@ -807,7 +807,7 @@ export default function Home() {
                     What&apos;s your budget?
                   </label>
                   <div className="flex gap-2">
-                    {localeConfig.budgetPresets.map((opt) => (
+                    {localeConfig.budgetPresets.map((opt: number) => (
                       <button
                         key={opt}
                         onClick={() => { setBudget(opt); setCustomBudget(""); }}
