@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
+import { useLocale } from "@/lib/locale";
 import { fetchFavorites, removeFavorite } from "@/lib/supabase/db";
 import type { FavoriteRow } from "@/lib/supabase/db";
 
@@ -13,6 +14,7 @@ interface Props {
 
 export default function FavoritesPanel({ open, onClose }: Props) {
   const { user } = useAuth();
+  const locale = useLocale();
   const [favorites, setFavorites] = useState<FavoriteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedList, setCopiedList] = useState(false);
@@ -38,13 +40,14 @@ export default function FavoritesPanel({ open, onClose }: Props) {
   };
 
   const handleCopyAll = () => {
+    const fallbackSearch = locale.fallbackStores[0]?.searchUrl ?? ((q: string) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`);
     const lines = favorites.map((f) => {
       const price = f.real_price ?? f.estimated_price ?? 0;
-      const url = f.product_url ?? `https://www.amazon.com/s?k=${encodeURIComponent(f.search_query || f.item_name)}`;
-      return `${f.item_name} — $${price} — ${url}`;
+      const url = f.product_url ?? fallbackSearch(f.search_query || f.item_name);
+      return `${f.item_name} — ${locale.currencySymbol}${price} — ${url}`;
     });
     const total = favorites.reduce((sum, f) => sum + (f.real_price ?? f.estimated_price ?? 0), 0);
-    const text = `My Roomify Favorites ($${total})\n${lines.join("\n")}`;
+    const text = `My Roomify Favorites (${locale.currencySymbol}${total})\n${lines.join("\n")}`;
     navigator.clipboard.writeText(text).then(() => {
       setCopiedList(true);
       setTimeout(() => setCopiedList(false), 2000);
@@ -106,7 +109,7 @@ export default function FavoritesPanel({ open, onClose }: Props) {
             </div>
           ) : (
             favorites.map((fav) => (
-              <FavoriteCard key={fav.id} fav={fav} onRemove={() => handleRemove(fav.id)} />
+              <FavoriteCard key={fav.id} fav={fav} onRemove={() => handleRemove(fav.id)} currencySymbol={locale.currencySymbol} fallbackSearchUrl={locale.fallbackStores[0]?.searchUrl} />
             ))
           )}
         </div>
