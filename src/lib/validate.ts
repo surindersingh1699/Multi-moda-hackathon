@@ -1,9 +1,7 @@
-import { StylingResult, StylingItem, VisionAnalysis } from "./schema";
+import { StylingResult, StylingItem } from "./schema";
 
 type ValidationOk = { ok: true; data: StylingResult };
 type ValidationErr = { ok: false; error: string };
-type VisionOk = { ok: true; data: VisionAnalysis };
-type VisionErr = { ok: false; error: string };
 
 /** Strict validation used server-side (rejects invalid responses). */
 export function validateResult(
@@ -163,34 +161,3 @@ export function parseResultSafe(data: unknown): ValidationOk | ValidationErr {
   return { ok: true, data: result };
 }
 
-/** Validate Step 1 vision analysis output */
-export function validateVisionAnalysis(
-  data: unknown
-): VisionOk | VisionErr {
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return { ok: false, error: "Vision analysis is not a valid object" };
-  }
-  const r = data as Record<string, unknown>;
-  if (typeof r.room_type !== "string" || !r.room_type) {
-    return { ok: false, error: "Missing room_type" };
-  }
-  if (typeof r.room_reading !== "string" || !r.room_reading) {
-    return { ok: false, error: "Missing room_reading" };
-  }
-  if (typeof r.style_direction !== "string" || !r.style_direction) {
-    return { ok: false, error: "Missing style_direction" };
-  }
-  if (typeof r.existing_color_palette !== "string" || !r.existing_color_palette) {
-    return { ok: false, error: "Missing existing_color_palette" };
-  }
-  if (typeof r.lighting_assessment !== "string" || !r.lighting_assessment) {
-    return { ok: false, error: "Missing lighting_assessment" };
-  }
-  if (typeof r.whats_working !== "string" || !r.whats_working) {
-    return { ok: false, error: "Missing whats_working" };
-  }
-  if (!Array.isArray(r.identified_needs) || r.identified_needs.length === 0) {
-    return { ok: false, error: "Missing or empty identified_needs" };
-  }
-  return { ok: true, data: data as VisionAnalysis };
-}

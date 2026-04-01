@@ -3,35 +3,36 @@ import { GoogleGenAI, RawReferenceImage } from "@google/genai";
 
 export interface ImageGenResult {
   imageDataUrl: string;
-  provider: "imagen3" | "gpt-image-1";
+  provider: "imagen3" | "gpt-image-1.5";
 }
 
 /**
  * Generate a styled room image using a fallback chain:
- * Imagen 3 (Vertex AI) → gpt-image-1
+ * gpt-image-1.5 (OpenAI) → Imagen 3 (Vertex AI)
  */
 export async function generateStyledRoom(
   imageBuffer: Buffer,
   prompt: string,
   size: "1024x1024" | "1536x1024" | "1024x1536"
 ): Promise<ImageGenResult> {
-  // Try Imagen 3 first (Vertex AI Express)
-  if (process.env.VERTEX_AI_KEY) {
+  // Try gpt-image-1.5 first (OpenAI)
+  if (process.env.OPENAI_API_KEY) {
     try {
-      const result = await generateWithImagen3(imageBuffer, prompt);
-      if (result) return result;
+      return await generateWithGptImage15(imageBuffer, prompt, size);
     } catch (e) {
-      console.warn("Imagen 3 failed, trying next provider:", e);
+      console.warn("gpt-image-1.5 failed, trying next provider:", e);
     }
   }
 
-  // Fall back to gpt-image-1 (OpenAI)
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error(
-      "No image generation provider available. Set VERTEX_AI_KEY or OPENAI_API_KEY."
-    );
+  // Fall back to Imagen 3 (Vertex AI)
+  if (process.env.VERTEX_AI_KEY) {
+    const result = await generateWithImagen3(imageBuffer, prompt);
+    if (result) return result;
   }
-  return generateWithGptImage1(imageBuffer, prompt, size);
+
+  throw new Error(
+    "No image generation provider available. Set OPENAI_API_KEY or VERTEX_AI_KEY."
+  );
 }
 
 // ── Imagen 3 via Google GenAI SDK ─────────────────────────────────
@@ -67,9 +68,9 @@ async function generateWithImagen3(
   };
 }
 
-// ── gpt-image-1 via OpenAI ───────────────────────────────────────
+// ── gpt-image-1.5 via OpenAI ──────────────────────────────────────
 
-async function generateWithGptImage1(
+async function generateWithGptImage15(
   imageBuffer: Buffer,
   prompt: string,
   size: "1024x1024" | "1536x1024" | "1024x1536"
@@ -82,24 +83,25 @@ async function generateWithGptImage1(
   const imageFile = new File([arrayBuffer], "room.png", { type: "image/png" });
 
   const response = await openai.images.edit({
-    model: "gpt-image-1",
+    model: "gpt-image-1.5",
     image: imageFile,
     prompt,
     size,
+    quality: "low",
   });
 
   const b64 = response.data?.[0]?.b64_json;
   if (b64) {
     return {
       imageDataUrl: `data:image/png;base64,${b64}`,
-      provider: "gpt-image-1",
+      provider: "gpt-image-1.5",
     };
   }
 
   const url = response.data?.[0]?.url;
   if (url) {
-    return { imageDataUrl: url, provider: "gpt-image-1" };
+    return { imageDataUrl: url, provider: "gpt-image-1.5" };
   }
 
-  throw new Error("No image data in gpt-image-1 response");
+  throw new Error("No image data in gpt-image-1.5 response");
 }

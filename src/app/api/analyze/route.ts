@@ -1,20 +1,14 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
-import {
-  buildVisionPrompt,
-  buildRecommendationPrompt,
-  buildPromptWithPreferences,
-} from "@/lib/prompt";
+import { buildPromptWithPreferences } from "@/lib/prompt";
 import type { StyleMode } from "@/lib/prompt";
 import {
-  VISION_RESPONSE_FORMAT,
-  RECOMMENDATION_RESPONSE_FORMAT,
   RESPONSE_FORMAT,
   GEMINI_RESPONSE_JSON_SCHEMA,
 } from "@/lib/schema";
 import type { StylingResult } from "@/lib/schema";
-import { validateResult, validateVisionAnalysis } from "@/lib/validate";
+import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
 import { optimizeForVision, imageHash } from "@/lib/image";
@@ -134,6 +128,13 @@ export async function POST(req: NextRequest) {
     // Optimize image once (sharp resize to 1536px, JPEG q85)
     const optimizedImage = await optimizeForVision(image);
 
+    // Build the prompt
+    const systemPrompt = buildPromptWithPreferences(
+      userPrompt,
+      budgetNum,
+      styleMode
+    );
+
     // SSE stream response
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -150,97 +151,40 @@ export async function POST(req: NextRequest) {
           let finalResult: StylingResult;
 
           if (process.env.OPENAI_API_KEY) {
-            const openai = new OpenAI();
-
-            // Step 1: Vision analysis (GPT-4o with image, detail: high)
-            const visionPrompt = buildVisionPrompt(userPrompt);
-            const visionResult = await callOpenAIVision(
-              openai,
+            // Single GPT-4o call: image + recommendations in one shot
+            finalResult = (await callOpenAI(
+              new OpenAI(),
               optimizedImage,
-              visionPrompt
-            );
-            const visionValidation = validateVisionAnalysis(visionResult);
-
-            if (!visionValidation.ok) {
-              throw new Error(
-                `Vision analysis failed: ${visionValidation.error}`
-              );
-            }
-
-            const analysis = visionValidation.data;
-
-            // Send analysis event immediately
-            send("analysis", {
-              room_reading: analysis.room_reading,
-              style_direction: analysis.style_direction,
-            });
-
-            // Step 2: Recommendations (GPT-4o-mini, text only — cheaper)
-            const recPrompt = buildRecommendationPrompt(
-              analysis,
-              budgetNum,
-              userPrompt,
-              styleMode
-            );
-            const recResult = (await callOpenAIRecommendations(
-              openai,
-              recPrompt
-            )) as Record<string, unknown>;
-
-            finalResult = {
-              room_reading: analysis.room_reading,
-              style_direction: analysis.style_direction,
-              items: recResult.items as StylingResult["items"],
-              quick_wins: recResult.quick_wins as string[],
-              total_estimated_cost:
-                recResult.total_estimated_cost as number,
-            };
+              systemPrompt
+            )) as StylingResult;
           } else {
-            // Gemini-only path (single call with schema enforcement)
-            const systemPrompt = buildPromptWithPreferences(
-              userPrompt,
-              budgetNum,
-              styleMode
-            );
+            // Gemini fallback (single call with schema enforcement)
             finalResult = (await callGemini(
               optimizedImage,
               systemPrompt
             )) as StylingResult;
           }
 
-          // Validate merged result
+          // Validate result
           let validated = validateResult(finalResult, budgetNum);
 
           if (!validated.ok) {
-            // Retry once with the legacy single-call path
-            console.warn(
-              "Validation failed, retrying:",
-              validated.error
-            );
-            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with 4-6 items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
+            // Retry once with a correction hint
+            console.warn("Validation failed, retrying:", validated.error);
+            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with ${budgetNum <= 100 ? "3-4" : "4-6"} items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
 
             if (process.env.OPENAI_API_KEY) {
-              const openai = new OpenAI();
-              const retryPrompt = buildPromptWithPreferences(
-                userPrompt,
-                budgetNum,
-                styleMode
-              );
-              const retryResult = await callOpenAISingle(
-                openai,
+              const retryResult = await callOpenAI(
+                new OpenAI(),
                 optimizedImage,
-                retryPrompt,
+                systemPrompt,
                 retryHint
               );
               validated = validateResult(retryResult, budgetNum);
             } else if (process.env.GOOGLE_API_KEY) {
-              const retryPrompt =
-                buildPromptWithPreferences(userPrompt, budgetNum, styleMode) +
-                "\n\n" +
-                retryHint;
               const retryResult = await callGemini(
                 optimizedImage,
-                retryPrompt
+                systemPrompt + "\n\n" + retryHint
               );
               validated = validateResult(retryResult, budgetNum);
             }
@@ -257,13 +201,6 @@ export async function POST(req: NextRequest) {
           // Cache + record usage
           setCache(hash, finalResult);
           await supabase.from("usage").insert({ user_id: user.id });
-
-          // Send recommendations event
-          send("recommendations", {
-            items: finalResult.items,
-            quick_wins: finalResult.quick_wins,
-            total_estimated_cost: finalResult.total_estimated_cost,
-          });
 
           // Send complete event with full result
           send("complete", finalResult);
@@ -302,60 +239,8 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Step 1: GPT-4o vision — image → analysis */
-async function callOpenAIVision(
-  openai: OpenAI,
-  imageDataUrl: string,
-  systemPrompt: string
-): Promise<unknown> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    max_tokens: 768,
-    response_format: VISION_RESPONSE_FORMAT,
-    messages: [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: { url: imageDataUrl, detail: "high" },
-          },
-        ],
-      },
-    ],
-  });
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("Empty response from vision model");
-  return JSON.parse(content);
-}
-
-/** Step 2: GPT-4o-mini text-only — analysis → recommendations */
-async function callOpenAIRecommendations(
-  openai: OpenAI,
-  systemPrompt: string
-): Promise<unknown> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_tokens: 1024,
-    response_format: RECOMMENDATION_RESPONSE_FORMAT,
-    messages: [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content:
-          "Based on the room analysis above, recommend items for this room.",
-      },
-    ],
-  });
-  const content = response.choices[0]?.message?.content;
-  if (!content)
-    throw new Error("Empty response from recommendation model");
-  return JSON.parse(content);
-}
-
-/** Legacy single-call path — used for retry */
-async function callOpenAISingle(
+/** Single GPT-4o call: image (detail: high) → analysis + recommendations */
+async function callOpenAI(
   openai: OpenAI,
   imageDataUrl: string,
   systemPrompt: string,
@@ -376,7 +261,7 @@ async function callOpenAISingle(
   if (retryHint) messages.push({ role: "user", content: retryHint });
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1",
     max_tokens: 1024,
     response_format: RESPONSE_FORMAT,
     messages,
