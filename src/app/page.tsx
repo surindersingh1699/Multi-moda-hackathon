@@ -536,7 +536,7 @@ export default function Home() {
         if (prev < targetStepRef.current) return prev + 1;
         return prev; // hold — server hasn't progressed yet
       });
-    }, 600);
+    }, 400);
     return () => clearInterval(interval);
   }, [appState]);
 
@@ -571,7 +571,7 @@ export default function Home() {
       setIsSearchingProducts(true);
       findProducts(pending.data).then(() => setIsSearchingProducts(false));
       generateStyledRoom(pending.base64, pending.data, []);
-    }, 300);
+    }, 50);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appState, apiDone, loadingStep]);
