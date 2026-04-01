@@ -343,9 +343,9 @@ function ItemCard({
       )}
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-semibold text-txt-primary">{name}</h3>
-          <div className="shrink-0 flex items-center gap-1.5">
+        <div className="flex items-start justify-between gap-x-2">
+          <h3 className="text-sm font-semibold text-txt-primary min-w-0 break-words">{name}</h3>
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* Favorite heart button */}
             {onToggleFavorite && (
               <button
@@ -366,7 +366,7 @@ function ItemCard({
             {match && match.real_price != null && match.real_price !== price && (
               <span className="text-[10px] text-txt-muted line-through">{currencySymbol}{price}</span>
             )}
-            <span className="text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg">
+            <span className="text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg whitespace-nowrap">
               {currencySymbol}{match?.real_price ?? price}
             </span>
           </div>
@@ -404,7 +404,7 @@ function ItemCard({
               href={match.product_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-full bg-sage-100 border border-sage-400 px-3 py-0.5 text-[10px] font-semibold text-sage-400 hover:bg-sage-400 hover:text-white transition-colors"
+              className="inline-flex items-center gap-1 rounded-full bg-sage-100 border border-sage-400 px-3 py-0.5 text-[10px] font-semibold text-sage-400 hover:bg-sage-400 hover:text-white transition-colors max-w-full truncate"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />

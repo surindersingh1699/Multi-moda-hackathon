@@ -81,6 +81,7 @@ export default function Home() {
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
   const [apiDone, setApiDone] = useState(false);
   const pendingResultRef = useRef<{ data: StylingResult; base64: string } | null>(null);
+  const targetStepRef = useRef(0);
 
   // History, Favorites, Compare panel state
   const [showHistory, setShowHistory] = useState(false);
@@ -290,6 +291,7 @@ export default function Home() {
 
     setAppState("loading");
     setLoadingStep(0);
+    targetStepRef.current = 0;
     setApiDone(false);
     pendingResultRef.current = null;
     setError(null);
@@ -350,7 +352,10 @@ export default function Home() {
                 continue;
               }
 
-              if (eventType === "complete") {
+              if (eventType === "step") {
+                targetStepRef.current = data.step as number;
+              } else if (eventType === "complete") {
+                targetStepRef.current = LOADING_STEPS.length - 1;
                 const parsed = parseResultSafe(data);
                 if (!parsed.ok) throw new Error(`Invalid response: ${parsed.error}`);
                 pendingResultRef.current = { data: parsed.data, base64 };
@@ -359,9 +364,6 @@ export default function Home() {
               } else if (eventType === "error") {
                 throw new Error((data.error as string) || "Analysis failed");
               }
-              // "analysis" and "recommendations" events are intermediate —
-              // the loading animation still plays through, and results reveal
-              // after the "complete" event via the existing pendingResultRef flow.
 
               eventType = "";
             }

@@ -106,24 +106,29 @@ export async function POST(req: NextRequest) {
 
         try {
           let finalResult: StylingResult;
+          const storeList = locale.storeList;
+          const currSym = locale.currencySymbol;
 
           if (process.env.OPENAI_API_KEY) {
-            finalResult = await twoStepOpenAI(
-              new OpenAI(),
-              optimizedImage,
-              creativePrompt,
-              budgetNum,
-              locale.currencySymbol,
-              locale.storeList
-            );
+            const openai = new OpenAI();
+            // Step A: Creative ideation (vision)
+            const creative = await callOpenAICreative(openai, optimizedImage, creativePrompt);
+            send("step", { step: 1 });
+
+            // Step B: Shopping conversion (text)
+            const shoppingPrompt = buildShoppingPrompt(creative, budgetNum, currSym, storeList);
+            send("step", { step: 2 });
+            finalResult = await callOpenAIShopping(openai, shoppingPrompt) as StylingResult;
+            send("step", { step: 3 });
           } else {
-            finalResult = await twoStepGemini(
-              optimizedImage,
-              creativePrompt,
-              budgetNum,
-              locale.currencySymbol,
-              locale.storeList
-            );
+            // Gemini path
+            const creative = await callGeminiCreative(optimizedImage, creativePrompt);
+            send("step", { step: 1 });
+
+            const shoppingPrompt = buildShoppingPrompt(creative, budgetNum, currSym, storeList);
+            send("step", { step: 2 });
+            finalResult = await callGeminiText(shoppingPrompt) as StylingResult;
+            send("step", { step: 3 });
           }
 
           // Validate result
@@ -171,7 +176,8 @@ export async function POST(req: NextRequest) {
           // Record usage
           await supabase.from("usage").insert({ user_id: user.id });
 
-          // Send complete event with full result
+          // Final step + complete
+          send("step", { step: 4 });
           send("complete", finalResult);
           controller.close();
         } catch (e) {
@@ -208,29 +214,7 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-// ── Two-step OpenAI pipeline ──────────────────────────────────────
-
-async function twoStepOpenAI(
-  openai: OpenAI,
-  imageDataUrl: string,
-  creativePrompt: string,
-  budget: number,
-  currencySymbol = "$",
-  storeList = "Amazon, Walmart, Target, IKEA, HomeGoods"
-): Promise<StylingResult> {
-  // Step A: Creative ideation (high temperature, with image)
-  const creative = await callOpenAICreative(
-    openai,
-    imageDataUrl,
-    creativePrompt
-  );
-
-  // Step B: Shopping conversion (low temperature, text only)
-  const shoppingPrompt = buildShoppingPrompt(creative, budget, currencySymbol, storeList);
-  const result = await callOpenAIShopping(openai, shoppingPrompt);
-
-  return result as StylingResult;
-}
+// ── OpenAI helpers ───────────────────────────────────────────────
 
 /** Step A — Creative ideation: image + high temperature */
 async function callOpenAICreative(
@@ -279,24 +263,7 @@ async function callOpenAIShopping(
   return JSON.parse(content);
 }
 
-// ── Two-step Gemini pipeline ──────────────────────────────────────
-
-async function twoStepGemini(
-  imageDataUrl: string,
-  creativePrompt: string,
-  budget: number,
-  currencySymbol = "$",
-  storeList = "Amazon, Walmart, Target, IKEA, HomeGoods"
-): Promise<StylingResult> {
-  // Step A: Creative ideation (with image)
-  const creative = await callGeminiCreative(imageDataUrl, creativePrompt);
-
-  // Step B: Shopping conversion (text only)
-  const shoppingPrompt = buildShoppingPrompt(creative, budget, currencySymbol, storeList);
-  const result = await callGeminiText(shoppingPrompt);
-
-  return result as StylingResult;
-}
+// ── Gemini helpers ───────────────────────────────────────────────
 
 /** Step A — Gemini creative ideation with image */
 async function callGeminiCreative(
