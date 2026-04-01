@@ -17,18 +17,19 @@ export default function FavoritesPanel({ open, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [copiedList, setCopiedList] = useState(false);
 
+  const userId = user?.id;
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     setLoading(true);
     const supabase = createClient();
-    const rows = await fetchFavorites(supabase, user.id);
+    const rows = await fetchFavorites(supabase, userId);
     setFavorites(rows);
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    if (open && user) load();
-  }, [open, user, load]);
+    if (open && userId) load();
+  }, [open, userId, load]);
 
   const handleRemove = async (id: string) => {
     setFavorites((prev) => prev.filter((f) => f.id !== id));
