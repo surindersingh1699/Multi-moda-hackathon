@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { optimizeForEdit, parseDataUrl } from "@/lib/image";
-import { generateStyledRoom, generateStyledRoomWithProvider } from "@/lib/image-gen";
+import { generateStyledRoomWithProvider } from "@/lib/image-gen";
 import { createClient } from "@/lib/supabase/server";
 
 interface ItemInput {
@@ -63,27 +63,63 @@ export async function POST(req: NextRequest) {
 
     const hasLighting = items.some((i) => i.category.toLowerCase().includes("light"));
 
-    // Positive-framing prompt — works better with all image gen models
-    const editPrompt = `This is a real room photo. Keep everything exactly as it is — same walls, floor, furniture, layout, perspective, and lighting.
+    // Base compositing instructions shared by both providers
+    const basePrompt = `This is a real photograph of a room. Your job is a precise photo-edit: composite new items into the existing photo so the result looks like an untouched photograph.
 
-Your only task: naturally add these specific small items into the existing room at the exact locations specified:
+PRESERVE EVERYTHING — this is non-negotiable:
+- Same walls, floor, ceiling, furniture, objects, layout, camera angle, and perspective
+- Do NOT move, resize, repaint, remove, or alter ANY existing object
+- Do NOT hallucinate new space, expand walls, or clear surfaces
+
+ADD ONLY these items at their specified locations:
 ${itemList}
-${styleDirection ? `\nStyle hint: ${styleDirection}` : ""}
+${styleDirection ? `\nStyle direction: ${styleDirection} — let this guide the items' look, NOT the room itself.` : ""}
 
-Each item has a specific placement — follow it precisely. The items should look naturally integrated, matching the room's existing scale and perspective.
+Compositing rules:
+- Each item must match the room's existing perspective, scale, and depth of field
+- Items cast soft shadows consistent with the room's light source direction
+- Items interact realistically with surfaces (a vase sits ON a table, a throw drapes OVER an arm)
+- If an item cannot fit naturally at its location without overlapping existing objects, omit it — fewer items is better than a broken photo
+- CRITICAL: Add ONLY the exact products listed — no extra accessories, no styling additions. If the list says "floating shelf", render an empty shelf — do NOT add vases, books, or decor on it. The user can only buy the listed products, so the image must show exactly what they will receive.`;
 
-CRITICAL: Add ONLY the exact products listed above — nothing more. Do NOT add accessories, decorative objects, books, plants, or styling items that are not in the list. For example, if the list says "floating shelf", add ONLY the empty shelf — do NOT place vases, books, or decor on it. The user can only buy the listed products, so the image must show exactly what they will receive.
+    // Imagen 3 — strict preservation, no atmosphere changes
+    const imagenPrompt = `${basePrompt}
+- Same lighting direction, color temperature, and shadow patterns
+${hasLighting ? "- Since lighting items are included, you may subtly warm the ambient light near those items." : ""}
 
-${hasLighting ? "Since lighting items are included, you may subtly warm the overall lighting tone." : "Keep the existing lighting and color tone exactly as-is."}
+The final image must be indistinguishable from a real photograph of this same room with these items naturally present.`;
 
-The result should look like a real photo of the same room with just these small additions visible. Everything else stays identical.`;
+    // OpenAI gpt-image-1.5 — natural but polished, strict size preservation
+    const openaiPrompt = `${basePrompt}
+- Same lighting direction, color temperature, and shadow patterns
+- Every existing piece of furniture must remain the EXACT same size, shape, position, and color — do NOT resize, reshape, stretch, or reposition any existing object
+${hasLighting ? "- Since lighting items are included, you may subtly warm the ambient light near those items." : ""}
 
+PHOTO POLISH — keep it natural, just slightly elevated:
+- The room should look like a cleaner, slightly better-lit version of itself — as if someone tidied up and the natural light happened to be really good that day
+- You may subtly warm the overall tone and gently lift the contrast so the photo feels inviting rather than flat
+- Keep it realistic and natural — it should never look filtered, processed, or AI-generated
+- The new items should blend in so well that the photo looks like they were always there
+
+The final image must be indistinguishable from a real photograph of this same room with these items naturally present.`;
 
     const size = pickSize(optimizedBuffer);
 
-    const result = provider === "gemini"
-      ? await generateStyledRoomWithProvider(optimizedBuffer, editPrompt, size, "gemini")
-      : await generateStyledRoom(optimizedBuffer, editPrompt, size);
+    // Provider routing with per-provider prompts
+    let result;
+    if (provider === "gemini") {
+      result = await generateStyledRoomWithProvider(optimizedBuffer, imagenPrompt, size, "gemini");
+    } else if (provider === "imagen") {
+      result = await generateStyledRoomWithProvider(optimizedBuffer, imagenPrompt, size, "imagen");
+    } else {
+      // Default: try OpenAI (cinematic) first, fall back to Imagen (strict)
+      try {
+        result = await generateStyledRoomWithProvider(optimizedBuffer, openaiPrompt, size, "openai");
+      } catch (e) {
+        console.warn("OpenAI gpt-image-1.5 failed, falling back to Imagen 3:", e);
+        result = await generateStyledRoomWithProvider(optimizedBuffer, imagenPrompt, size, "imagen");
+      }
+    }
 
     console.log(`Styled room generated via ${result.provider}`);
 

@@ -42,9 +42,15 @@ export async function generateStyledRoom(
 export async function generateStyledRoomWithProvider(
   imageBuffer: Buffer,
   prompt: string,
-  _size: "1024x1024" | "1536x1024" | "1024x1536",
-  provider: "gemini" | "imagen"
+  size: "1024x1024" | "1536x1024" | "1024x1536",
+  provider: "gemini" | "imagen" | "openai"
 ): Promise<ImageGenResult> {
+  if (provider === "openai") {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is required for OpenAI image editing.");
+    }
+    return await generateWithGptImage15(imageBuffer, prompt, size);
+  }
   if (provider === "imagen") {
     if (!process.env.VERTEX_AI_KEY) {
       throw new Error("VERTEX_AI_KEY is required for Imagen image editing.");
