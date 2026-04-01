@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import Image from "next/image";
 // Canvas-based conversion: works natively in Safari/iOS which support HEIC
 const convertViaCanvas = (blob: Blob): Promise<Blob> =>
@@ -128,7 +128,13 @@ interface Props {
 
 export default function ImageUpload({ onImageSelected, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMobile(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+  }, []);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [converting, setConverting] = useState(false);
@@ -282,6 +288,16 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
           ref={inputRef}
           type="file"
           accept="image/*"
+          onChange={onFileChange}
+          className="hidden"
+          disabled={disabled}
+        />
+        {/* Separate camera input for Android — capture forces camera-only */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           onChange={onFileChange}
           className="hidden"
           disabled={disabled}

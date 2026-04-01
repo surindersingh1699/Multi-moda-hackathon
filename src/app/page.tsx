@@ -14,7 +14,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/locale";
 import {
   saveAnalysis,
-  updateAnalysisStyledImage,
   updateAnalysisProducts,
   addFavorite,
   removeFavoriteByItem,
@@ -451,17 +450,13 @@ export default function Home() {
           imageBase64,
           styleDirection: analysisResult.style_direction,
           items: itemsWithProducts,
+          analysisId: currentAnalysisId.current || undefined,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.styledImageUrl) {
           setStyledImageUrl(data.styledImageUrl);
-          // Persist styled image URL to Supabase
-          if (currentAnalysisId.current) {
-            const supabase = createClient();
-            updateAnalysisStyledImage(supabase, currentAnalysisId.current, data.styledImageUrl);
-          }
         }
       }
     } catch {
@@ -471,7 +466,7 @@ export default function Home() {
     }
   };
 
-  const regenerateWithGemini = async () => {
+  const regenerateWithImagen = async () => {
     if (!result || !lastImageBase64Ref.current) return;
     setIsGeneratingImage(true);
     setImageGenFailed(false);
@@ -493,21 +488,18 @@ export default function Home() {
           imageBase64: lastImageBase64Ref.current,
           styleDirection: result.style_direction,
           items: itemsWithProducts,
-          provider: "gemini",
+          provider: "imagen",
+          analysisId: currentAnalysisId.current || undefined,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.styledImageUrl) {
           setStyledImageUrl(data.styledImageUrl);
-          if (currentAnalysisId.current) {
-            const supabase = createClient();
-            updateAnalysisStyledImage(supabase, currentAnalysisId.current, data.styledImageUrl);
-          }
         }
       } else {
         const body = await res.json().catch(() => ({}));
-        console.warn("Gemini retry failed:", body.error);
+        console.warn("Imagen retry failed:", body.error);
         setImageGenFailed(true);
       }
     } catch {
@@ -675,34 +667,38 @@ export default function Home() {
                 {/* Favorites button */}
                 <button
                   onClick={() => setShowFavorites(true)}
-                  className="relative flex items-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors px-2.5 py-1"
+                  className="relative flex items-center justify-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors p-2 sm:px-3 sm:py-1.5"
+                  title="Saved items"
                 >
-                  <svg className="w-3.5 h-3.5 text-rose-400" fill={favorites.length > 0 ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-rose-400" fill={favorites.length > 0 ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  <span className="text-[10px] font-semibold text-txt-muted">Saved{favorites.length > 0 ? ` (${favorites.length})` : ""}</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-txt-muted">Saved{favorites.length > 0 ? ` (${favorites.length})` : ""}</span>
+                  {favorites.length > 0 && <span className="sm:hidden absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-400" />}
                 </button>
 
                 {/* History button */}
                 <button
                   onClick={() => setShowHistory(true)}
-                  className="flex items-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors px-2.5 py-1"
+                  className="flex items-center justify-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors p-2 sm:px-3 sm:py-1.5"
+                  title="History"
                 >
-                  <svg className="w-3.5 h-3.5 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-[10px] font-semibold text-txt-muted">History</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-txt-muted">History</span>
                 </button>
 
                 {/* Compare button */}
                 <button
                   onClick={() => setShowCompare(true)}
-                  className="flex items-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors px-2.5 py-1"
+                  className="flex items-center justify-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors p-2 sm:px-3 sm:py-1.5"
+                  title="Compare"
                 >
-                  <svg className="w-3.5 h-3.5 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
                   </svg>
-                  <span className="text-[10px] font-semibold text-txt-muted">Compare</span>
+                  <span className="hidden sm:inline text-[11px] font-semibold text-txt-muted">Compare</span>
                 </button>
               </>
             )}
@@ -718,14 +714,14 @@ export default function Home() {
                   const supabase = createClient();
                   await supabase.auth.signOut();
                 }}
-                className="text-[10px] font-semibold uppercase tracking-wider text-txt-muted border border-accent-200 rounded-full px-2.5 py-0.5 bg-bg-card/50 hover:bg-accent-50 transition-colors"
+                className="text-[11px] font-semibold uppercase tracking-wider text-txt-muted border border-accent-200 rounded-full px-3 py-1 bg-bg-card/50 hover:bg-accent-50 transition-colors"
               >
                 Sign Out
               </button>
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="text-[10px] font-semibold uppercase tracking-wider text-txt-on-accent rounded-full px-2.5 py-0.5 transition-colors"
+                className="text-[11px] font-semibold uppercase tracking-wider text-txt-on-accent rounded-full px-3 py-1 transition-colors"
                 style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D)' }}
               >
                 Sign In
@@ -1011,6 +1007,15 @@ export default function Home() {
               <p className="text-sm text-txt-secondary max-w-sm mx-auto">
                 We found {result.items?.length ?? 0} items to transform your room — all for under {localeConfig.currencySymbol}{result.total_estimated_cost ?? 0}.
               </p>
+              <button
+                onClick={reset}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-txt-muted hover:text-accent-500 transition-colors mt-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Start over with a new room
+              </button>
             </div>
 
             {/* Try a Different Vibe — Quick Reroll */}
@@ -1056,11 +1061,11 @@ export default function Home() {
                   name="custom-vibe"
                   type="text"
                   placeholder="Or describe your own vibe..."
-                  className="flex-1 rounded-full border border-accent-200 bg-bg-secondary px-4 py-2 text-xs text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all"
+                  className="flex-1 rounded-full border border-accent-200 bg-bg-secondary px-4 py-2.5 text-xs text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all"
                 />
                 <button
                   type="submit"
-                  className="rounded-full px-4 py-2 text-xs font-semibold text-txt-on-accent transition-all duration-200"
+                  className="rounded-full px-5 py-2.5 text-xs font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.97]"
                   style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
                 >
                   Go
@@ -1076,7 +1081,8 @@ export default function Home() {
                   afterSrc={styledImageUrl}
                 />
                 {/* Download + Retry actions */}
-                <div className="flex justify-center gap-2">
+                <div className="flex gap-2 mt-1">
+                  {/* Download button — prominent with gradient */}
                   <button
                     onClick={async () => {
                       setIsDownloading(true);
@@ -1098,36 +1104,43 @@ export default function Home() {
                       }
                     }}
                     disabled={isDownloading}
-                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-txt-muted hover:text-accent-500 transition-colors px-3 py-1.5 rounded-full border border-accent-100 hover:border-accent-300 disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.98] disabled:opacity-70"
+                    style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
                   >
                     {isDownloading ? (
-                      <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
+                    ) : downloadDone ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
                     ) : (
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                     )}
-                    {isDownloading ? "Saving..." : downloadDone ? "Saved!" : "Download Image"}
+                    {isDownloading ? "Saving..." : downloadDone ? "Saved!" : "Save Image"}
                   </button>
+
+                  {/* Exact match retry button */}
                   <button
-                    onClick={regenerateWithGemini}
+                    onClick={regenerateWithImagen}
                     disabled={isGeneratingImage}
-                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-txt-muted hover:text-accent-500 transition-colors px-3 py-1.5 rounded-full border border-accent-100 hover:border-accent-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold bg-bg-card border-2 border-accent-300 text-accent-600 transition-all duration-200 hover:bg-accent-50 hover:border-accent-400 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {isGeneratingImage ? (
-                      <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
                     ) : (
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     )}
-                    {isGeneratingImage ? "Regenerating..." : "Room look off? Retry for a closer match"}
+                    {isGeneratingImage ? "Regenerating..." : "Try Exact Match"}
                   </button>
                 </div>
               </div>

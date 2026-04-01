@@ -225,26 +225,26 @@ export default function ResultsDisplay({
       <div className="animate-fadeIn flex gap-2">
         <button
           onClick={handleCopyList}
-          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold bg-bg-card border border-accent-200 text-txt-secondary transition-all duration-200 hover:bg-accent-50 active:scale-[0.98]"
+          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.98]"
+          style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
         >
           <span className="flex items-center justify-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
-            {copiedList ? "Copied to clipboard!" : "Copy My Shopping List"}
+            {copiedList ? "Copied!" : "Copy Shopping List"}
           </span>
         </button>
         <button
           onClick={handleShare}
           disabled={isSharing}
-          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-txt-on-accent transition-all duration-200 active:scale-[0.98] disabled:opacity-70"
-          style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
+          className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold bg-bg-card border border-accent-200 text-txt-secondary transition-all duration-200 hover:bg-accent-50 active:scale-[0.98] disabled:opacity-70"
         >
           <span className="flex items-center justify-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
-            {isSharing ? "Creating share..." : shared ? "Shared!" : "Share My Makeover"}
+            {isSharing ? "Sharing..." : shared ? "Shared!" : "Share"}
           </span>
         </button>
       </div>
@@ -354,11 +354,11 @@ function ItemCard({
             {onToggleFavorite && (
               <button
                 onClick={handleFavorite}
-                className={`p-1 rounded-full transition-colors ${animating ? "animate-heartPop" : ""}`}
+                className={`p-2 -m-1 rounded-full transition-colors ${animating ? "animate-heartPop" : ""}`}
                 title={isFavorited ? "Remove from favorites" : "Add to favorites"}
               >
                 <svg
-                  className={`w-4 h-4 transition-colors ${isFavorited ? "text-rose-400 fill-rose-400" : "text-accent-200 hover:text-rose-400"}`}
+                  className={`w-5 h-5 transition-colors ${isFavorited ? "text-rose-400 fill-rose-400" : "text-accent-200 hover:text-rose-400"}`}
                   fill={isFavorited ? "currentColor" : "none"}
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -408,9 +408,10 @@ function ItemCard({
               href={match.product_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-full bg-sage-100 border border-sage-400 px-3 py-0.5 text-[10px] font-semibold text-sage-400 hover:bg-sage-400 hover:text-white transition-colors max-w-full truncate"
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold text-txt-on-accent hover:opacity-90 transition-all active:scale-[0.97] max-w-full truncate"
+              style={{ background: 'linear-gradient(135deg, #7EA86A, #5E8F4E)' }}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
               Buy Now @ {match.store}
@@ -424,13 +425,13 @@ function ItemCard({
                   href={store.searchUrl(searchQuery)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-colors ${
                     i === 0
                       ? "bg-accent-50 border border-accent-200 text-accent-600 hover:bg-accent-100"
                       : "bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100"
                   }`}
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
                   </svg>
                   {store.name}

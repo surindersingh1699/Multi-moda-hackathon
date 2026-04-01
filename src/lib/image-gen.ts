@@ -42,8 +42,16 @@ export async function generateStyledRoomWithProvider(
   imageBuffer: Buffer,
   prompt: string,
   _size: "1024x1024" | "1536x1024" | "1024x1536",
-  provider: "gemini"
+  provider: "gemini" | "imagen"
 ): Promise<ImageGenResult> {
+  if (provider === "imagen") {
+    if (!process.env.VERTEX_AI_KEY) {
+      throw new Error("VERTEX_AI_KEY is required for Imagen image editing.");
+    }
+    const result = await generateWithImagen3(imageBuffer, prompt);
+    if (!result) throw new Error("Imagen 3 returned no image");
+    return result;
+  }
   if (provider === "gemini") {
     if (!process.env.GOOGLE_API_KEY) {
       throw new Error("GOOGLE_API_KEY is required for Gemini image editing.");

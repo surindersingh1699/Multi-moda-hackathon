@@ -34,11 +34,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { imageBase64, items, styleDirection, provider } = (await req.json()) as {
+    const { imageBase64, items, styleDirection, provider, analysisId } = (await req.json()) as {
       imageBase64: string;
       items: ItemInput[];
       styleDirection?: string;
-      provider?: "gemini";
+      provider?: "gemini" | "imagen";
+      analysisId?: string;
     };
 
     if (!imageBase64 || !items?.length) {
@@ -93,8 +94,35 @@ Make the result photorealistic and attractive — the same room, just with a few
       originalHeight
     );
 
+    // Upload to Supabase storage as JPEG for sharing/persistence (fire-and-forget)
+    let styledStorageUrl: string | null = null;
+    if (analysisId) {
+      try {
+        const { buffer: correctedBuf } = parseDataUrl(correctedDataUrl);
+        const jpegBuf = await sharp(correctedBuf).jpeg({ quality: 85 }).toBuffer();
+        const storagePath = `${user.id}/${analysisId}/styled.jpg`;
+        const { error: uploadErr } = await supabase.storage
+          .from("room-images")
+          .upload(storagePath, jpegBuf, { contentType: "image/jpeg", upsert: true });
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from("room-images").getPublicUrl(storagePath);
+          styledStorageUrl = urlData.publicUrl;
+          // Persist the storage URL (not the data URL) to the analyses table
+          await supabase
+            .from("analyses")
+            .update({ styled_image_url: styledStorageUrl })
+            .eq("id", analysisId);
+        } else {
+          console.warn("Failed to upload styled image to storage:", uploadErr);
+        }
+      } catch (e) {
+        console.warn("Styled image storage upload failed:", e);
+      }
+    }
+
     return NextResponse.json({
       styledImageUrl: correctedDataUrl,
+      styledStorageUrl,
       provider: result.provider,
     });
   } catch (e) {
