@@ -56,10 +56,69 @@ const convertHeic = async (blob: Blob): Promise<Blob> => {
 };
 import { DoodleCamera, DoodleStar } from "@/components/DoodleElements";
 
-const MAX_SIZE_MB = 4;
+const MAX_SIZE_MB = 20; // accept up to 20MB uploads; we compress client-side
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+const TARGET_SIZE_BYTES = 3.5 * 1024 * 1024; // compress down to under 4MB
+const MAX_DIMENSION = 2048;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const HEIC_TYPES = ["image/heic", "image/heif"];
+
+/**
+ * Compress an image file client-side using canvas.
+ * Resizes to MAX_DIMENSION and adjusts JPEG quality to stay under TARGET_SIZE_BYTES.
+ */
+const compressImage = (file: File): Promise<File> =>
+  new Promise((resolve, reject) => {
+    // If already small enough, skip compression
+    if (file.size <= TARGET_SIZE_BYTES) {
+      resolve(file);
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      // Calculate resize dimensions
+      let { naturalWidth: w, naturalHeight: h } = img;
+      if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
+        const scale = MAX_DIMENSION / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context unavailable"));
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Try decreasing quality until under target size
+      const tryQuality = (quality: number) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error("Compression failed"));
+            if (blob.size > TARGET_SIZE_BYTES && quality > 0.4) {
+              tryQuality(quality - 0.1);
+            } else {
+              const name = file.name.replace(/\.\w+$/, ".jpg");
+              resolve(new File([blob], name, { type: "image/jpeg" }));
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      tryQuality(0.85);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to load image for compression"));
+    };
+    img.src = url;
+  });
 
 interface Props {
   onImageSelected: (file: File, previewUrl: string) => void;
@@ -109,7 +168,8 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
         try {
           const jpegBlob = await convertHeic(file);
           const converted = new File([jpegBlob], file.name.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg"), { type: "image/jpeg" });
-          processFile(converted);
+          const compressed = await compressImage(converted);
+          processFile(compressed);
         } catch {
           // Client-side conversion failed — pass HEIC through as-is.
           // Server will convert it with sharp before sending to vision API.
@@ -125,7 +185,16 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
         return;
       }
 
-      processFile(file);
+      // Compress large images client-side before uploading
+      setConverting(true);
+      try {
+        const compressed = await compressImage(file);
+        processFile(compressed);
+      } catch {
+        processFile(file);
+      } finally {
+        setConverting(false);
+      }
     },
     [processFile]
   );
@@ -168,7 +237,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
         {converting ? (
           <div className="flex flex-col items-center gap-2 py-4">
             <div className="w-6 h-6 border-2 border-accent-300 border-t-accent-500 rounded-full animate-spin" />
-            <p className="text-sm text-txt-secondary">Converting HEIC image...</p>
+            <p className="text-sm text-txt-secondary">Optimizing image...</p>
           </div>
         ) : preview ? (
           <div className="relative group w-full">
@@ -203,7 +272,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
               </span>
             </p>
             <p className="text-xs text-txt-muted mt-2">
-              JPG, PNG, WebP, or HEIC up to {MAX_SIZE_MB}MB
+              JPG, PNG, WebP, or HEIC up to 20MB
             </p>
           </>
         )}

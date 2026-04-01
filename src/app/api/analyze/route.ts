@@ -17,7 +17,7 @@ const MAX_USES = 5;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .filter(Boolean);
-const MAX_PAYLOAD_BYTES = 6 * 1024 * 1024;
+const MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
 // ── Content cache ──────────────────────────────────────────────────
 

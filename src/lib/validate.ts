@@ -24,9 +24,8 @@ export function validateResult(
     return { ok: false, error: "Missing required top-level fields" };
   }
 
-  const minItems = budget <= 100 ? 3 : 4;
-  if (r.items.length < minItems || r.items.length > 6) {
-    return { ok: false, error: `Expected ${minItems}-6 items, got ${r.items.length}` };
+  if (r.items.length < 5 || r.items.length > 6) {
+    return { ok: false, error: `Expected 5-6 items, got ${r.items.length}` };
   }
 
   if (r.total_estimated_cost > budget) {
