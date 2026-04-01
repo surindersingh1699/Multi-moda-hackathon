@@ -942,6 +942,18 @@ export default function Home() {
                 Your Makeover Plan is Ready!
                 <DoodleStar className="w-5 h-5 animate-twinkle" />
               </h2>
+              {activeVibe && (
+                <p className="flex items-center justify-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-txt-on-accent"
+                    style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" />
+                    </svg>
+                    {activeVibe}
+                  </span>
+                </p>
+              )}
               <p className="text-sm text-txt-secondary max-w-sm mx-auto">
                 We found {result.items?.length ?? 0} items to transform your room — all for under {localeConfig.currencySymbol}{result.total_estimated_cost ?? 0}.
               </p>
