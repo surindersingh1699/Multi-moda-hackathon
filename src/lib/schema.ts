@@ -41,9 +41,79 @@ export interface ProductSearchResult {
   status: "complete" | "partial" | "failed";
 }
 
-// ── OpenAI structured output schema ───────────────────────────────
+// ── Step A: Creative ideation schema (no prices/stores) ──────────
 
-/** Response format for the single-call analysis + recommendations */
+export interface CreativeIdea {
+  name: string;
+  category: string;
+  reason: string;
+}
+
+export interface CreativeResult {
+  room_reading: string;
+  style_direction: string;
+  ideas: CreativeIdea[];
+  quick_wins: string[];
+}
+
+/** OpenAI structured output for Step A (creative ideation) */
+export const CREATIVE_RESPONSE_FORMAT = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "creative_result",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        room_reading: { type: "string" },
+        style_direction: { type: "string" },
+        ideas: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              category: { type: "string" },
+              reason: { type: "string" },
+            },
+            required: ["name", "category", "reason"],
+            additionalProperties: false,
+          },
+        },
+        quick_wins: { type: "array", items: { type: "string" } },
+      },
+      required: ["room_reading", "style_direction", "ideas", "quick_wins"],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** Gemini-compatible JSON Schema for Step A (creative ideation) */
+export const GEMINI_CREATIVE_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    room_reading: { type: "string" },
+    style_direction: { type: "string" },
+    ideas: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          category: { type: "string" },
+          reason: { type: "string" },
+        },
+        required: ["name", "category", "reason"],
+      },
+    },
+    quick_wins: { type: "array", items: { type: "string" } },
+  },
+  required: ["room_reading", "style_direction", "ideas", "quick_wins"],
+};
+
+// ── Step B: Full shopping result schema ──────────────────────────
+
+/** Response format for the shopping conversion (final output) */
 export const RESPONSE_FORMAT = {
   type: "json_schema" as const,
   json_schema: {

@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
-import { buildPromptWithPreferences } from "@/lib/prompt";
+import { buildCreativePrompt, buildShoppingPrompt } from "@/lib/prompt";
 import {
+  CREATIVE_RESPONSE_FORMAT,
   RESPONSE_FORMAT,
+  GEMINI_CREATIVE_JSON_SCHEMA,
   GEMINI_RESPONSE_JSON_SCHEMA,
 } from "@/lib/schema";
-import type { StylingResult } from "@/lib/schema";
+import type { CreativeResult, StylingResult } from "@/lib/schema";
 import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
@@ -85,8 +87,8 @@ export async function POST(req: NextRequest) {
     // Optimize image once (sharp resize to 1536px, JPEG q85)
     const optimizedImage = await optimizeForVision(image);
 
-    // Build the prompt
-    const systemPrompt = buildPromptWithPreferences(userPrompt, budgetNum);
+    // Build creative prompt (Step A)
+    const creativePrompt = buildCreativePrompt(userPrompt, budgetNum);
 
     // SSE stream response
     const encoder = new TextEncoder();
@@ -104,40 +106,45 @@ export async function POST(req: NextRequest) {
           let finalResult: StylingResult;
 
           if (process.env.OPENAI_API_KEY) {
-            // Single GPT-4o call: image + recommendations in one shot
-            finalResult = (await callOpenAI(
+            finalResult = await twoStepOpenAI(
               new OpenAI(),
               optimizedImage,
-              systemPrompt
-            )) as StylingResult;
+              creativePrompt,
+              budgetNum
+            );
           } else {
-            // Gemini fallback (single call with schema enforcement)
-            finalResult = (await callGemini(
+            finalResult = await twoStepGemini(
               optimizedImage,
-              systemPrompt
-            )) as StylingResult;
+              creativePrompt,
+              budgetNum
+            );
           }
 
           // Validate result
           let validated = validateResult(finalResult, budgetNum);
 
           if (!validated.ok) {
-            // Retry once with a correction hint
-            console.warn("Validation failed, retrying:", validated.error);
-            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with 5-6 items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
+            // Retry Step B only (creative ideation was fine)
+            console.warn("Validation failed, retrying Step B:", validated.error);
+            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with the correct number of items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
 
             if (process.env.OPENAI_API_KEY) {
-              const retryResult = await callOpenAI(
+              const shoppingPrompt = buildShoppingPrompt(
+                finalResult as unknown as CreativeResult,
+                budgetNum
+              );
+              const retryResult = await callOpenAIShopping(
                 new OpenAI(),
-                optimizedImage,
-                systemPrompt,
-                retryHint
+                shoppingPrompt + "\n\n" + retryHint
               );
               validated = validateResult(retryResult, budgetNum);
             } else if (process.env.GOOGLE_API_KEY) {
-              const retryResult = await callGemini(
-                optimizedImage,
-                systemPrompt + "\n\n" + retryHint
+              const shoppingPrompt = buildShoppingPrompt(
+                finalResult as unknown as CreativeResult,
+                budgetNum
+              );
+              const retryResult = await callGeminiText(
+                shoppingPrompt + "\n\n" + retryHint
               );
               validated = validateResult(retryResult, budgetNum);
             }
@@ -191,43 +198,97 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-/** Single GPT-4o call: image (detail: high) → analysis + recommendations */
-async function callOpenAI(
+// ── Two-step OpenAI pipeline ──────────────────────────────────────
+
+async function twoStepOpenAI(
   openai: OpenAI,
   imageDataUrl: string,
-  systemPrompt: string,
-  retryHint?: string
-): Promise<unknown> {
-  const messages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
-    {
-      role: "user",
-      content: [
-        {
-          type: "image_url",
-          image_url: { url: imageDataUrl, detail: "high" },
-        },
-      ],
-    },
-  ];
-  if (retryHint) messages.push({ role: "user", content: retryHint });
+  creativePrompt: string,
+  budget: number
+): Promise<StylingResult> {
+  // Step A: Creative ideation (high temperature, with image)
+  const creative = await callOpenAICreative(
+    openai,
+    imageDataUrl,
+    creativePrompt
+  );
 
+  // Step B: Shopping conversion (low temperature, text only)
+  const shoppingPrompt = buildShoppingPrompt(creative, budget);
+  const result = await callOpenAIShopping(openai, shoppingPrompt);
+
+  return result as StylingResult;
+}
+
+/** Step A — Creative ideation: image + high temperature */
+async function callOpenAICreative(
+  openai: OpenAI,
+  imageDataUrl: string,
+  creativePrompt: string
+): Promise<CreativeResult> {
   const response = await openai.chat.completions.create({
     model: "gpt-4.1",
     max_tokens: 1024,
-    response_format: RESPONSE_FORMAT,
-    messages,
+    temperature: 1.1,
+    top_p: 1,
+    response_format: CREATIVE_RESPONSE_FORMAT,
+    messages: [
+      { role: "system", content: creativePrompt },
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: imageDataUrl, detail: "high" },
+          },
+        ],
+      },
+    ],
   });
   const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("Empty response from model");
+  if (!content) throw new Error("Empty response from creative step");
+  return JSON.parse(content) as CreativeResult;
+}
+
+/** Step B — Shopping conversion: text only, low temperature */
+async function callOpenAIShopping(
+  openai: OpenAI,
+  shoppingPrompt: string
+): Promise<unknown> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    max_tokens: 1024,
+    temperature: 0.2,
+    response_format: RESPONSE_FORMAT,
+    messages: [{ role: "system", content: shoppingPrompt }],
+  });
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("Empty response from shopping step");
   return JSON.parse(content);
 }
 
-/** Gemini fallback — single call with structured JSON schema */
-async function callGemini(
+// ── Two-step Gemini pipeline ──────────────────────────────────────
+
+async function twoStepGemini(
   imageDataUrl: string,
-  systemPrompt: string
-): Promise<unknown> {
+  creativePrompt: string,
+  budget: number
+): Promise<StylingResult> {
+  // Step A: Creative ideation (with image)
+  const creative = await callGeminiCreative(imageDataUrl, creativePrompt);
+
+  // Step B: Shopping conversion (text only)
+  const shoppingPrompt = buildShoppingPrompt(creative, budget);
+  const result = await callGeminiText(shoppingPrompt);
+
+  return result as StylingResult;
+}
+
+/** Step A — Gemini creative ideation with image */
+async function callGeminiCreative(
+  imageDataUrl: string,
+  creativePrompt: string
+): Promise<CreativeResult> {
   const genai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! });
   const match = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
   const mimeType = match?.[1] ?? "image/jpeg";
@@ -241,20 +302,46 @@ async function callGemini(
         parts: [
           {
             text:
-              systemPrompt +
-              "\n\nAnalyze this room image and return ONLY valid JSON matching the schema above.",
+              creativePrompt +
+              "\n\nAnalyze this room image and return ONLY valid JSON.",
           },
           { inlineData: { mimeType, data: base64Data } },
         ],
       },
     ],
     config: {
+      temperature: 1.1,
+      topP: 1,
+      responseMimeType: "application/json",
+      responseJsonSchema: GEMINI_CREATIVE_JSON_SCHEMA,
+    },
+  });
+
+  const content = response.text;
+  if (!content) throw new Error("Empty response from Gemini creative step");
+  return JSON.parse(content) as CreativeResult;
+}
+
+/** Step B — Gemini shopping conversion (text only) */
+async function callGeminiText(shoppingPrompt: string): Promise<unknown> {
+  const genai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! });
+
+  const response = await genai.models.generateContent({
+    model: "gemini-2.5-flash-preview-05-20",
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: shoppingPrompt }],
+      },
+    ],
+    config: {
+      temperature: 0.2,
       responseMimeType: "application/json",
       responseJsonSchema: GEMINI_RESPONSE_JSON_SCHEMA,
     },
   });
 
   const content = response.text;
-  if (!content) throw new Error("Empty response from Gemini");
+  if (!content) throw new Error("Empty response from Gemini shopping step");
   return JSON.parse(content);
 }

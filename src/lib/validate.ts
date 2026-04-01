@@ -24,8 +24,8 @@ export function validateResult(
     return { ok: false, error: "Missing required top-level fields" };
   }
 
-  if (r.items.length < 5 || r.items.length > 6) {
-    return { ok: false, error: `Expected 5-6 items, got ${r.items.length}` };
+  if (r.items.length < 4 || r.items.length > 6) {
+    return { ok: false, error: `Expected 4-6 items, got ${r.items.length}` };
   }
 
   if (r.total_estimated_cost > budget) {
