@@ -221,7 +221,7 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
   return (
     <div className="w-full">
       <div
-        onClick={() => !disabled && inputRef.current?.click()}
+        onClick={() => !disabled && !isMobile && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -260,9 +260,28 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
             <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             {/* Change photo label */}
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <span className="rounded-lg bg-white/90 backdrop-blur-sm px-4 py-2 text-xs font-semibold text-txt-primary shadow-sm">
-                Tap to swap photo
-              </span>
+              {isMobile ? (
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => cameraRef.current?.click()}
+                    className="rounded-lg bg-white/90 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-txt-primary shadow-sm active:scale-95 transition-transform"
+                  >
+                    Retake
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    className="rounded-lg bg-white/90 backdrop-blur-sm px-3 py-2 text-xs font-semibold text-txt-primary shadow-sm active:scale-95 transition-transform"
+                  >
+                    Gallery
+                  </button>
+                </div>
+              ) : (
+                <span className="rounded-lg bg-white/90 backdrop-blur-sm px-4 py-2 text-xs font-semibold text-txt-primary shadow-sm">
+                  Tap to swap photo
+                </span>
+              )}
             </div>
           </div>
         ) : (
@@ -272,15 +291,50 @@ export default function ImageUpload({ onImageSelected, disabled }: Props) {
               <DoodleCamera className="w-14 h-14" />
               <DoodleStar className="w-4 h-4 absolute -top-1 -right-2 animate-twinkle" />
             </div>
-            <p className="text-sm font-medium text-txt-secondary">
-              Drop your bedroom photo here or{" "}
-              <span className="text-accent-500 font-semibold underline decoration-accent-200 underline-offset-2 decoration-2">
-                choose a file
-              </span>
-            </p>
-            <p className="text-xs text-txt-muted mt-2">
-              JPG, PNG, WebP, or HEIC up to 20MB
-            </p>
+            {isMobile ? (
+              <>
+                <div className="flex gap-3 mt-1" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => cameraRef.current?.click()}
+                    disabled={disabled}
+                    className="flex items-center gap-1.5 rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-white shadow-sm active:scale-95 transition-transform"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+                    </svg>
+                    Take Photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={disabled}
+                    className="flex items-center gap-1.5 rounded-lg border-2 border-accent-300 bg-white px-4 py-2 text-sm font-semibold text-accent-600 shadow-sm active:scale-95 transition-transform"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                    Gallery
+                  </button>
+                </div>
+                <p className="text-xs text-txt-muted mt-3">
+                  JPG, PNG, WebP, or HEIC up to 20MB
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-txt-secondary">
+                  Drop your bedroom photo here or{" "}
+                  <span className="text-accent-500 font-semibold underline decoration-accent-200 underline-offset-2 decoration-2">
+                    choose a file
+                  </span>
+                </p>
+                <p className="text-xs text-txt-muted mt-2">
+                  JPG, PNG, WebP, or HEIC up to 20MB
+                </p>
+              </>
+            )}
           </>
         )}
 

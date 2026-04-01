@@ -96,12 +96,18 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let closed = false;
         const send = (event: string, data: unknown) => {
-          controller.enqueue(
-            encoder.encode(
-              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-            )
-          );
+          if (closed) return;
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+              )
+            );
+          } catch {
+            closed = true;
+          }
         };
 
         try {
@@ -179,13 +185,15 @@ export async function POST(req: NextRequest) {
           // Final step + complete
           send("step", { step: 4 });
           send("complete", finalResult);
-          controller.close();
         } catch (e) {
           const message =
             e instanceof Error ? e.message : "Failed to analyze image";
           console.error("Analyze stream error:", e);
           send("error", { error: message });
-          controller.close();
+        } finally {
+          if (!closed) {
+            try { controller.close(); } catch { /* already closed */ }
+          }
         }
       },
     });
