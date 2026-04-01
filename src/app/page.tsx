@@ -27,7 +27,7 @@ import { trackUploadPhoto, trackGenerateRoom } from "@/lib/analytics";
 import type { StylingResult, ProductMatch, ProductSearchResult, StylingItem } from "@/lib/schema";
 
 
-const MAX_USES = 3;
+const MAX_USES = 5;
 const PENDING_IMAGE_KEY = "roomify_pending_image";
 
 type AppState = "idle" | "loading" | "error" | "results";
@@ -563,11 +563,10 @@ export default function Home() {
         currentAnalysisId.current = id;
       }
 
-      // Sequential: find products first, then use them for image generation
+      // Parallel: product search and image generation run simultaneously
       setIsSearchingProducts(true);
-      const products = await findProducts(pending.data);
-      setIsSearchingProducts(false);
-      generateStyledRoom(pending.base64, pending.data, products);
+      findProducts(pending.data).then(() => setIsSearchingProducts(false));
+      generateStyledRoom(pending.base64, pending.data, []);
     }, 800);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -755,7 +754,7 @@ export default function Home() {
                   >
                     Sign in
                   </button>{" "}
-                  to get 3 free room makeovers
+                  to get 5 free room makeovers
                 </p>
               </div>
             )}
@@ -1026,7 +1025,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Sequential progress: products → image generation */}
+            {/* Parallel progress: products + image generation */}
             {(isSearchingProducts || isGeneratingImage) && !styledImageUrl && (
               <div className="rounded-2xl bg-bg-card border border-accent-100 p-5 animate-fadeIn"
                 style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}

@@ -73,7 +73,7 @@ export default function AuthModal({ onClose }: Props) {
             {mode === "login" ? "Welcome back" : "Create an account"}
           </h3>
           <p className="text-xs text-txt-muted mt-1">
-            Get 3 free room makeovers
+            Get 5 free room makeovers
           </p>
         </div>
 

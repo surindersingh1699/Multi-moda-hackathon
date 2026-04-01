@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { optimizeForVision } from "@/lib/image";
 import { getLocaleConfig } from "@/lib/locale-config";
 
-const MAX_USES = 3;
+const MAX_USES = 5;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .filter(Boolean);
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         return jsonResponse(
           {
             error:
-              "You've reached the maximum of 3 free uses. Join our waiting list for more!",
+              "You've reached the maximum of 5 free uses. Join our waiting list for more!",
           },
           429
         );

@@ -59,36 +59,22 @@ export async function POST(req: NextRequest) {
       })
       .join("\n");
 
-    // Photo-editor prompt — preserve room geometry, add decor only
-    const editPrompt = `Restyle this room by adding the recommended decor items, but preserve the original room geometry exactly.
-${styleDirection ? `\nOverall style direction: ${styleDirection}\n` : ""}
-Items to add:
+    // Photo-editor prompt — structure-first, then add decor
+    const editPrompt = `CRITICAL: This is a photo editing task. The room structure must be IDENTICAL to the input image. Every wall, window, door, TV, screen, mirror, shelf, ceiling, floor, and piece of existing furniture must remain exactly as-is — same position, size, shape, and proportions. Do not move, remove, shrink, stretch, or reshape anything that already exists. If people or pets are visible, preserve them exactly.
+
+Your only job: place a few new decor items into the existing room. Nothing else changes.
+${styleDirection ? `\nStyle direction: ${styleDirection}` : ""}
+
+Items to place:
 ${itemList}
 
-NON-NEGOTIABLE STRUCTURE RULES:
-- Do NOT change the room layout, camera angle, perspective, wall positions, ceiling line, floor shape, or depth.
-- Do NOT move, resize, remove, compress, stretch, crop, or reshape any existing architectural or built-in elements.
-- Windows must remain windows. Do not turn windows into walls, art, curtains-only surfaces, or blank space.
-- TVs, monitors, screens, mirrors, doors, vents, outlets, shelves, and built-in fixtures must keep their original size, shape, position, and proportions.
-- Do NOT shrink or compress existing furniture or objects to make space for new products.
-- Do NOT invent new walls, remove corners, widen surfaces, or flatten alcoves.
-- Keep all existing major furniture and permanent room features in the same exact location and proportions.
-- People: if anyone is visible, preserve them EXACTLY — same skin tone, hair, clothes, position.
-- Pets: if any animals are visible, preserve them EXACTLY.
+Placement rules:
+- Only place items where there is real empty space — on bare surfaces, empty walls, or open floor areas.
+- If there is not enough room, skip items rather than forcing them in.
+- Never place anything on top of screens, TVs, windows, mirrors, or doors.
+- Keep realistic scale for every added item.
 
-DECOR PLACEMENT RULES:
-- Only add products where there is realistic free space.
-- If there is not enough room, use fewer items instead of forcing them in.
-- Never overlap products onto TVs, windows, doors, walkways, or built-in fixtures.
-- Maintain realistic scale for every added item.
-- Prefer subtle, believable styling over dramatic transformation.
-
-VISUAL GOAL:
-- Produce a polished, attractive, eye-catching makeover.
-- The result should feel like the same room, just better styled.
-- Keep photorealism high and preserve the original identity of the room.
-
-Return a single edited image.`;
+Make the result photorealistic and attractive — the same room, just with a few well-chosen additions.`;
 
 
     const size = pickSize(optimizedBuffer);
