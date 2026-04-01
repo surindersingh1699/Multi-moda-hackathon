@@ -38,7 +38,7 @@ export default function UsageBanner() {
 
       <div className="space-y-2">
         <h3 className="text-lg font-bold text-txt-primary">
-          You&apos;ve used all 5 free makeovers!
+          You&apos;ve used all 3 free makeovers!
         </h3>
         <p className="text-sm text-txt-secondary max-w-md mx-auto leading-relaxed">
           We&apos;re in the testing phase. Please join our waiting list and let

@@ -27,7 +27,7 @@ import { trackUploadPhoto, trackGenerateRoom } from "@/lib/analytics";
 import type { StylingResult, ProductMatch, ProductSearchResult, StylingItem } from "@/lib/schema";
 
 
-const MAX_USES = 5;
+const MAX_USES = 3;
 const PENDING_IMAGE_KEY = "roomify_pending_image";
 
 type AppState = "idle" | "loading" | "error" | "results";
@@ -755,7 +755,7 @@ export default function Home() {
                   >
                     Sign in
                   </button>{" "}
-                  to get 5 free room makeovers
+                  to get 3 free room makeovers
                 </p>
               </div>
             )}
