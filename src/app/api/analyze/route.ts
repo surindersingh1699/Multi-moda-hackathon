@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import { buildPromptWithPreferences } from "@/lib/prompt";
-import type { StyleMode } from "@/lib/prompt";
 import {
   RESPONSE_FORMAT,
   GEMINI_RESPONSE_JSON_SCHEMA,
@@ -60,11 +59,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { image, userPrompt, budget, styleMode: rawMode } = await req.json();
-    const styleMode: StyleMode =
-      rawMode === "smart_saver" || rawMode === "luxe_feel"
-        ? rawMode
-        : "balanced";
+    const { image, userPrompt, budget } = await req.json();
 
     if (!image || typeof image !== "string") {
       return jsonResponse({ error: "Missing or invalid image data" }, 400);
@@ -118,7 +113,7 @@ export async function POST(req: NextRequest) {
 
     // Cache check — key includes prompt + budget so different vibes get fresh results
     const prompt = typeof userPrompt === "string" ? userPrompt.trim() : "";
-    const hash = imageHash(image) + `:${prompt}:${budgetNum}:${styleMode}`;
+    const hash = imageHash(image) + `:${prompt}:${budgetNum}`;
     const cached = getCached(hash);
     if (cached) {
       await supabase.from("usage").insert({ user_id: user.id });
@@ -129,11 +124,7 @@ export async function POST(req: NextRequest) {
     const optimizedImage = await optimizeForVision(image);
 
     // Build the prompt
-    const systemPrompt = buildPromptWithPreferences(
-      userPrompt,
-      budgetNum,
-      styleMode
-    );
+    const systemPrompt = buildPromptWithPreferences(userPrompt, budgetNum);
 
     // SSE stream response
     const encoder = new TextEncoder();
@@ -171,7 +162,7 @@ export async function POST(req: NextRequest) {
           if (!validated.ok) {
             // Retry once with a correction hint
             console.warn("Validation failed, retrying:", validated.error);
-            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with ${budgetNum <= 100 ? "3-4" : "4-6"} items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
+            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with 5-6 items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
 
             if (process.env.OPENAI_API_KEY) {
               const retryResult = await callOpenAI(

@@ -29,8 +29,12 @@ export async function optimizeForVision(dataUrl: string): Promise<string> {
  */
 export async function optimizeForEdit(
   dataUrl: string
-): Promise<{ buffer: Buffer; mimeType: string }> {
+): Promise<{ buffer: Buffer; mimeType: string; originalWidth: number; originalHeight: number }> {
   const { buffer } = parseDataUrl(dataUrl);
+
+  const meta = await sharp(buffer).metadata();
+  const originalWidth = meta.width ?? 1024;
+  const originalHeight = meta.height ?? 1024;
 
   const optimized = await sharp(buffer)
     .resize(MAX_DIMENSION, MAX_DIMENSION, {
@@ -40,7 +44,7 @@ export async function optimizeForEdit(
     .png()
     .toBuffer();
 
-  return { buffer: optimized, mimeType: "image/png" };
+  return { buffer: optimized, mimeType: "image/png", originalWidth, originalHeight };
 }
 
 /**

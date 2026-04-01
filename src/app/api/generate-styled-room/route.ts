@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { optimizeForEdit } from "@/lib/image";
+import sharp from "sharp";
+import { optimizeForEdit, parseDataUrl } from "@/lib/image";
 import { generateStyledRoom } from "@/lib/image-gen";
 
 interface ItemInput {
@@ -33,8 +34,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Optimize image for editing (resized to 1536px, PNG)
-    const { buffer: optimizedBuffer } = await optimizeForEdit(imageBase64);
+    // Optimize image for editing (resized to 1536px, PNG) + capture original dimensions
+    const { buffer: optimizedBuffer, originalWidth, originalHeight } = await optimizeForEdit(imageBase64);
 
     const itemList = items
       .map(
@@ -91,8 +92,15 @@ The owner should look at this and think: "That's definitely my room — but thos
 
     console.log(`Styled room generated via ${result.provider}`);
 
+    // Resize output to match original aspect ratio (capped at AI native resolution)
+    const correctedDataUrl = await matchOriginalAspectRatio(
+      result.imageDataUrl,
+      originalWidth,
+      originalHeight
+    );
+
     return NextResponse.json({
-      styledImageUrl: result.imageDataUrl,
+      styledImageUrl: correctedDataUrl,
       provider: result.provider,
     });
   } catch (e) {
@@ -107,6 +115,49 @@ The owner should look at this and think: "That's definitely my room — but thos
       { status: 500 }
     );
   }
+}
+
+/**
+ * Resize AI-generated image to match the original photo's aspect ratio.
+ * Capped at the AI's native resolution (no upscaling beyond what was generated).
+ */
+async function matchOriginalAspectRatio(
+  dataUrl: string,
+  origW: number,
+  origH: number
+): Promise<string> {
+  const { buffer } = parseDataUrl(dataUrl);
+  const meta = await sharp(buffer).metadata();
+  const genW = meta.width ?? 1024;
+  const genH = meta.height ?? 1024;
+
+  const origRatio = origW / origH;
+  const genRatio = genW / genH;
+
+  // If aspect ratios already match closely, skip resize
+  if (Math.abs(origRatio - genRatio) < 0.05) return dataUrl;
+
+  // Compute target size that matches original aspect ratio
+  // but stays within the generated image's pixel budget
+  let targetW: number;
+  let targetH: number;
+
+  if (origRatio > genRatio) {
+    // Original is wider — use generated width, shrink height
+    targetW = genW;
+    targetH = Math.round(genW / origRatio);
+  } else {
+    // Original is taller — use generated height, shrink width
+    targetH = genH;
+    targetW = Math.round(genH * origRatio);
+  }
+
+  const resized = await sharp(buffer)
+    .resize(targetW, targetH, { fit: "fill" })
+    .png()
+    .toBuffer();
+
+  return `data:image/png;base64,${resized.toString("base64")}`;
 }
 
 /** Detect aspect ratio from PNG header for gpt-image-1 size param */

@@ -24,14 +24,14 @@ import { DoodleBear, DoodleBearThinking, DoodleBearHappy, DoodleStar, DoodleCame
 import { parseResultSafe } from "@/lib/validate";
 import { trackUploadPhoto, trackGenerateRoom } from "@/lib/analytics";
 import type { StylingResult, ProductMatch, ProductSearchResult, StylingItem } from "@/lib/schema";
-import type { StyleMode } from "@/lib/prompt";
+
 
 const MAX_USES = 5;
 const PENDING_IMAGE_KEY = "roomify_pending_image";
 
 type AppState = "idle" | "loading" | "error" | "results";
 
-const BUDGET_OPTIONS = [75, 150, 250] as const;
+const BUDGET_OPTIONS = [100, 150, 200, 500] as const;
 
 const LOADING_STEPS = [
   { text: "Hmm, let me take a good look at your room...", Icon: DoodleCamera },
@@ -41,11 +41,6 @@ const LOADING_STEPS = [
   { text: "Putting your makeover plan together!", Icon: DoodleFrame },
 ];
 
-const STYLE_MODE_OPTIONS: { value: StyleMode; label: string; desc: string }[] = [
-  { value: "smart_saver", label: "Smart Saver", desc: "Max impact, min spend" },
-  { value: "balanced", label: "Balanced", desc: "Taste meets value" },
-  { value: "luxe_feel", label: "Luxe Feel", desc: "Premium & aspirational" },
-];
 
 const VIBE_OPTIONS = [
   { label: "Clean Upgrade", prompt: "elevate what's already here — fix what's missing, keep the existing style, just make it look polished and intentional" },
@@ -71,7 +66,6 @@ export default function Home() {
   const [budget, setBudget] = useState<number>(150);
   const [customBudget, setCustomBudget] = useState<string>("");
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
-  const [styleMode, setStyleMode] = useState<StyleMode>("balanced");
   const [loadingStep, setLoadingStep] = useState(0);
 
   // Phase 2: styled room image state
@@ -297,7 +291,6 @@ export default function Home() {
           image: base64,
           userPrompt: prompt || undefined,
           budget,
-          styleMode,
         }),
       });
 
@@ -557,7 +550,6 @@ export default function Home() {
     setProductSearchFailed(false);
     setUserPrompt("");
     setActiveVibe(null);
-    setStyleMode("balanced");
     setApiDone(false);
     pendingResultRef.current = null;
     setAppState("idle");
@@ -797,32 +789,6 @@ export default function Home() {
                         style={customBudget ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
                       />
                     </div>
-                  </div>
-                </div>
-
-                {/* Style mode selector */}
-                <div>
-                  <label className="block text-xs font-semibold text-txt-muted uppercase tracking-wider mb-1.5">
-                    How should we spend your budget?
-                  </label>
-                  <div className="flex gap-2">
-                    {STYLE_MODE_OPTIONS.map((mode) => (
-                      <button
-                        key={mode.value}
-                        onClick={() => setStyleMode(mode.value)}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-center transition-all duration-200 ${
-                          styleMode === mode.value
-                            ? "text-txt-on-accent shadow-sm"
-                            : "bg-bg-card border border-accent-200 text-txt-secondary hover:border-accent-400"
-                        }`}
-                        style={styleMode === mode.value ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
-                      >
-                        <span className="block text-sm font-semibold">{mode.label}</span>
-                        <span className={`block text-[10px] mt-0.5 ${styleMode === mode.value ? "text-white/80" : "text-txt-muted"}`}>
-                          {mode.desc}
-                        </span>
-                      </button>
-                    ))}
                   </div>
                 </div>
 
