@@ -72,6 +72,8 @@ ${styleDirection ? `\nStyle hint: ${styleDirection}` : ""}
 
 Each item has a specific placement — follow it precisely. The items should look naturally integrated, matching the room's existing scale and perspective.
 
+CRITICAL: Add ONLY the exact products listed above — nothing more. Do NOT add accessories, decorative objects, books, plants, or styling items that are not in the list. For example, if the list says "floating shelf", add ONLY the empty shelf — do NOT place vases, books, or decor on it. The user can only buy the listed products, so the image must show exactly what they will receive.
+
 ${hasLighting ? "Since lighting items are included, you may subtly warm the overall lighting tone." : "Keep the existing lighting and color tone exactly as-is."}
 
 The result should look like a real photo of the same room with just these small additions visible. Everything else stays identical.`;
