@@ -1,6 +1,6 @@
 # Roomify — AI Room Stylist on a Real Budget
 
-Snap your room photo. Get a designer makeover plan in 30 seconds — with real, shoppable products from Amazon, Target & IKEA, all under your budget.
+Snap your room photo. Get a designer makeover plan in 30 seconds — with real, shoppable products from Amazon, all under your budget.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![GPT-4o](https://img.shields.io/badge/GPT--4o-Vision-412991?logo=openai)
@@ -12,10 +12,10 @@ Snap your room photo. Get a designer makeover plan in 30 seconds — with real, 
 ## How It Works
 
 1. **Upload** a room photo (bedroom, living room, kitchen, office — any room)
-2. **Pick a vibe** — Cozy Hygge, Minimalist, Boho Chic, Dark Academia, or Cottagecore
+2. **Pick a vibe** — Cozy Hygge, Minimalist, Boho Chic, Dark Academia, Cottagecore, or enter your own
 3. **Set your budget** — $50, $100, or $150
 4. **AI analyzes** your room and recommends 4–6 high-impact styling items
-5. **Shopping Agent** finds real products with real prices and direct links
+5. **Shopping Agent** finds real products on Amazon with prices and direct links
 6. **Before/After preview** shows your room with the new items added
 
 ## Features
@@ -23,13 +23,17 @@ Snap your room photo. Get a designer makeover plan in 30 seconds — with real, 
 - **AI Room Analysis** — GPT-4o Vision (detail: high) with Gemini 2.5 Flash fallback
 - **2-Step Pipeline** — Vision analysis (GPT-4o) + text recommendations (GPT-4o-mini) for better quality at lower cost
 - **SSE Streaming** — Progressive results as analysis completes
-- **Smart Shopping Agent** — Searches Amazon first (with ASINs for add-to-cart), falls back to Google Shopping
+- **Smart Shopping Agent** — Searches Amazon via ScraperAPI with ASIN extraction for direct product links
 - **Styled Room Preview** — Multi-provider image generation (Imagen 3 → Flux Kontext → gpt-image-1)
 - **Before/After Slider** — Interactive drag comparison
 - **Budget Tracking** — All recommendations validated to stay within budget
-- **Vibe Reroll** — Quick-switch between 5 aesthetic styles without re-uploading
-- **Copy & Share** — Export your shopping list or share via Web Share API
-- **Content Caching** — Identical photos return cached results instantly
+- **Vibe Reroll** — Quick-switch between aesthetic styles without re-uploading
+- **Custom Vibe** — Enter your own style description for personalized recommendations
+- **Favorites** — Save and revisit your favorite room designs
+- **History** — Browse past analyses without re-uploading
+- **Shareable Results** — Share your styled room via unique link or Web Share API
+- **Google OAuth** — Sign in with Google via Supabase auth
+- **HEIC Support** — Upload photos directly from iPhone (auto-converted to JPEG)
 - **Graceful Fallbacks** — Works with partial API keys; full mock mode with no keys at all
 
 ## Tech Stack
@@ -43,7 +47,7 @@ Snap your room photo. Get a designer makeover plan in 30 seconds — with real, 
 | AI Recommendations | OpenAI GPT-4o-mini |
 | Image Gen | Imagen 3 / Flux Kontext / gpt-image-1 |
 | Image Optimization | sharp |
-| Product Search | SerpAPI (Amazon + Google Shopping) |
+| Product Search | ScraperAPI (Amazon structured search) |
 | Auth | Supabase (Google OAuth) |
 | Analytics | PostHog |
 | Deployment | Vercel |
@@ -76,7 +80,7 @@ GOOGLE_API_KEY=AIzaSy...         # Gemini fallback + Imagen 3
 REPLICATE_API_TOKEN=             # replicate.com API token
 
 # Required — for real product search
-SERPAPI_KEY=...                   # serpapi.com API key
+SCRAPERAPI_KEY=...               # scraperapi.com API key
 
 # Auth (optional)
 NEXT_PUBLIC_SUPABASE_URL=        # Supabase project URL
@@ -113,8 +117,9 @@ Analyzes a room photo and returns styling recommendations via SSE streaming.
 Finds real shoppable products matching AI recommendations.
 
 - **Input:** Array of styling items with search queries
-- **Output:** Product matches with titles, prices, URLs, thumbnails
-- **Fallback:** Amazon → Google Shopping → Mock data
+- **Output:** Product matches with titles, prices, URLs, thumbnails, ASINs
+- **Search:** Amazon via ScraperAPI structured endpoint
+- **Fallback:** Mock data when no API key is set
 
 ### `POST /api/generate-styled-room`
 
@@ -124,6 +129,14 @@ Generates a before/after visualization of the styled room.
 - **Output:** Styled room image (base64), provider name
 - **Fallback:** Imagen 3 → Flux Kontext → gpt-image-1
 
+### `POST /api/convert-heic`
+
+Converts HEIC images (from iPhone) to JPEG for processing.
+
+### `POST /api/share-image`
+
+Generates a shareable link for a styled room result.
+
 ## Project Structure
 
 ```
@@ -131,14 +144,27 @@ src/
   app/
     api/
       analyze/               # Room analysis (GPT-4o → GPT-4o-mini, SSE)
-      find-products/          # Product search (SerpAPI)
+      find-products/          # Product search (ScraperAPI → Amazon)
       generate-styled-room/   # Image generation (Imagen 3 / Flux / gpt-image-1)
+      convert-heic/           # HEIC → JPEG conversion
+      share-image/            # Shareable link generation
+    auth/
+      callback/               # Supabase OAuth callback
+    share/
+      [id]/                   # Shared result page
     page.tsx                  # Main app UI + state
     layout.tsx                # Root layout + metadata
     globals.css               # Tailwind theme + animations
   components/
     ImageUpload.tsx           # Drag-drop photo upload
     ResultsDisplay.tsx        # Results panel + shopping list
+    CompareView.tsx           # Before/after slider comparison
+    FavoritesPanel.tsx        # Saved favorites drawer
+    HistoryPanel.tsx          # Past analyses drawer
+    AuthModal.tsx             # Google OAuth sign-in modal
+    AuthProvider.tsx          # Auth context provider
+    UsageBanner.tsx           # Usage limit indicator
+    PostHogProvider.tsx       # Analytics provider
     DoodleElements.tsx        # Decorative SVG illustrations
   lib/
     schema.ts                 # TypeScript types + JSON schemas
@@ -147,6 +173,13 @@ src/
     image.ts                  # Sharp optimization + hashing
     image-gen.ts              # Multi-provider image generation
     mock.ts                   # Demo mode fixture data
+    analytics.ts              # PostHog event helpers
+    supabase/
+      client.ts               # Browser Supabase client
+      server.ts               # Server Supabase client
+      middleware.ts            # Auth middleware helpers
+      db.ts                   # Database queries
+  middleware.ts               # Next.js middleware (auth session refresh)
 ```
 
 ## Deployment

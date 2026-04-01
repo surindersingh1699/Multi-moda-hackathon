@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { optimizeForEdit, parseDataUrl } from "@/lib/image";
 import { generateStyledRoom } from "@/lib/image-gen";
+import { createClient } from "@/lib/supabase/server";
 
 interface ItemInput {
   name: string;
@@ -12,6 +13,16 @@ interface ItemInput {
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth check — prevent unauthenticated credit burn
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Please sign in to generate styled rooms" },
+        { status: 401 }
+      );
+    }
+
     if (
       !process.env.OPENAI_API_KEY &&
       !process.env.GOOGLE_API_KEY &&
@@ -23,9 +34,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { imageBase64, items } = (await req.json()) as {
+    const { imageBase64, items, styleDirection } = (await req.json()) as {
       imageBase64: string;
       items: ItemInput[];
+      styleDirection?: string;
     };
 
     if (!imageBase64 || !items?.length) {
@@ -47,42 +59,36 @@ export async function POST(req: NextRequest) {
       })
       .join("\n");
 
-    // Photo-editor prompt — faithful to the room, smart about real-world conditions
-    const hasLighting = items.some((i) =>
-      i.category.toLowerCase().includes("light")
-    );
-    const editPrompt = `You are a photo editor. Edit this real room photo to show what it would look like with a few new items added. The room must be instantly recognizable as the exact same room.
-
-Add these new items at the specified locations:
+    // Photo-editor prompt — preserve room geometry, add decor only
+    const editPrompt = `Restyle this room by adding the recommended decor items, but preserve the original room geometry exactly.
+${styleDirection ? `\nOverall style direction: ${styleDirection}\n` : ""}
+Items to add:
 ${itemList}
 
-ABSOLUTE RULES — never break these:
-- People: if anyone is visible, preserve them EXACTLY — same skin tone, same hair, same clothes, same position. Do NOT tint, recolor, reshape, or alter any person in any way.
-- Pets: if any animals are visible, preserve them EXACTLY — same fur color, same size, same position. Do NOT alter any animal.
-- Walls, floor, ceiling, major furniture, architectural features — keep exactly as they are. Same colors, same textures, same materials.
+NON-NEGOTIABLE STRUCTURE RULES:
+- Do NOT change the room layout, camera angle, perspective, wall positions, ceiling line, floor shape, or depth.
+- Do NOT move, resize, remove, compress, stretch, crop, or reshape any existing architectural or built-in elements.
+- Windows must remain windows. Do not turn windows into walls, art, curtains-only surfaces, or blank space.
+- TVs, monitors, screens, mirrors, doors, vents, outlets, shelves, and built-in fixtures must keep their original size, shape, position, and proportions.
+- Do NOT shrink or compress existing furniture or objects to make space for new products.
+- Do NOT invent new walls, remove corners, widen surfaces, or flatten alcoves.
+- Keep all existing major furniture and permanent room features in the same exact location and proportions.
+- People: if anyone is visible, preserve them EXACTLY — same skin tone, hair, clothes, position.
+- Pets: if any animals are visible, preserve them EXACTLY.
 
-Room lighting (subtle improvement only):
-- You may improve the ambient room lighting to feel slightly warmer and more inviting — as if better lamps were turned on.${hasLighting ? "\n- The new lighting items in the list are switched ON and casting a natural warm glow in their immediate area." : ""}
-- Apply lighting changes ONLY to room surfaces (walls, ceiling, floor reflections) — NEVER change the color of people, pets, furniture, or objects.
-- Think "the room has nicer lighting" — NOT "everything is orange/golden." Keep it believable and subtle.
+DECOR PLACEMENT RULES:
+- Only add products where there is realistic free space.
+- If there is not enough room, use fewer items instead of forcing them in.
+- Never overlap products onto TVs, windows, doors, walkways, or built-in fixtures.
+- Maintain realistic scale for every added item.
+- Prefer subtle, believable styling over dramatic transformation.
 
-Handling mess and clutter:
-- If the room is messy, that's fine — it's a real lived-in space. Keep it recognizable.
-- You may do VERY LIMITED tidying: straighten a crooked blanket, align pillows that are slightly off, fix a tilted frame.
-- Do NOT remove clutter, hide personal items, or dramatically reorganize. A few clothes on a chair, items on a desk, things on the floor — leave them. The owner knows their room is messy and will be suspicious if it's magically spotless.
-- The goal is "same room with new items added" — not "room that was cleaned by a crew."
+VISUAL GOAL:
+- Produce a polished, attractive, eye-catching makeover.
+- The result should feel like the same room, just better styled.
+- Keep photorealism high and preserve the original identity of the room.
 
-Placing new items:
-- Place the new items naturally so they look like they belong in the scene.
-- Items should have realistic scale, shadows, and lighting consistent with the room.
-
-What you must NOT do:
-- Do NOT add objects that aren't in the item list above.
-- Do NOT change any surface material, paint color, or existing texture.
-- Do NOT apply color grading, filters, or heavy tone shifts to the whole image.
-- Do NOT make it look like CGI or a render — it should still feel like a real phone photo, just with new items placed in.
-
-The owner should look at this and think: "That's definitely my room — but those new items look great in it."`;
+Return a single edited image.`;
 
 
     const size = pickSize(optimizedBuffer);

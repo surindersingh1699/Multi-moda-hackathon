@@ -87,7 +87,7 @@ async function generateWithGptImage15(
     image: imageFile,
     prompt,
     size,
-    quality: "low",
+    quality: "medium",
   });
 
   const b64 = response.data?.[0]?.b64_json;

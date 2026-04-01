@@ -24,12 +24,12 @@
 ---
 
 ## Architecture Notes
-- 2-step analysis: GPT-4o vision (detail: high) → GPT-4o-mini text recommendations
-- Image generation fallback chain: Imagen 3 → Flux Kontext → gpt-image-1
+- 2-step analysis: GPT-4.1 vision (detail: high, temp 1.1) → GPT-4.1 text shopping (temp 0.2)
+- Image generation fallback chain: gpt-image-1.5 (OpenAI) → Imagen 3 (Vertex AI)
 - AI fallback: OpenAI → Gemini → Mock data
 - Server-side image optimization with sharp (1536px max)
-- SSE streaming from /api/analyze (cache hits return plain JSON)
-- Content cache by image hash (1hr TTL, 100 entries)
+- SSE streaming from /api/analyze
+- Auth required on all API routes (analyze, find-products, generate-styled-room)
 
 ---
 

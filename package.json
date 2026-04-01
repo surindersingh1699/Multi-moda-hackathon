@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.47.0",
+    "@sentry/nextjs": "^10.47.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.0",
     "canvas-confetti": "^1.9.4",

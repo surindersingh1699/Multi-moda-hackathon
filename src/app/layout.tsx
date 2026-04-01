@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/AuthProvider";
 import PostHogProvider from "@/components/PostHogProvider";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,27 +16,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roomify — AI Bedroom Stylist on a Real Budget",
+  title: "Roomify — AI Room Stylist on a Real Budget",
   description:
-    "Upload a bedroom photo. Get a designer makeover plan with real, shoppable products from Amazon, Target & IKEA — all under your budget. Powered by GPT-4o Vision.",
+    "Upload a room photo. Get a designer makeover plan with real, shoppable products from Amazon, Target & IKEA — all under your budget. Powered by GPT-4o Vision.",
   keywords: [
     "AI interior design",
     "room makeover",
-    "budget bedroom",
+    "budget room styling",
     "GPT-4o",
-    "hackathon",
+    "AI room stylist",
   ],
   authors: [{ name: "Roomify Team" }],
   openGraph: {
-    title: "Roomify — AI Bedroom Stylist",
+    title: "Roomify — AI Room Stylist",
     description:
-      "Snap your bedroom. Get a designer makeover plan in 30 seconds. Real products. Real prices. Real links.",
+      "Snap your room. Get a designer makeover plan in 30 seconds. Real products. Real prices. Real links.",
     type: "website",
     siteName: "Roomify",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Roomify — AI Bedroom Stylist",
+    title: "Roomify — AI Room Stylist",
     description:
       "Upload a photo. Your AI interior designer does the rest.",
   },
@@ -55,11 +56,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen flex flex-col relative">
-        <AuthProvider>
-          <PostHogProvider>
-            {children}
-          </PostHogProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <PostHogProvider>
+              {children}
+            </PostHogProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

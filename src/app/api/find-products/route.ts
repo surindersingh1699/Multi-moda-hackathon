@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { StylingItem, ProductMatch, ProductSearchResult } from "@/lib/schema";
 import { MOCK_PRODUCT_MATCHES } from "@/lib/mock";
+import { createClient } from "@/lib/supabase/server";
+import { getLocaleConfig } from "@/lib/locale";
 
 const SCRAPERAPI_BASE = "https://api.scraperapi.com/structured/amazon/search";
 
 export async function POST(req: NextRequest) {
   try {
-    const { items } = (await req.json()) as { items: StylingItem[] };
+    // Auth check — prevent unauthenticated credit burn
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json(
+        { matches: [], status: "failed" } satisfies ProductSearchResult,
+        { status: 401 },
+      );
+    }
+
+    const { items, countryCode } = (await req.json()) as { items: StylingItem[]; countryCode?: string };
 
     if (!items?.length) {
       return NextResponse.json(
@@ -23,7 +35,8 @@ export async function POST(req: NextRequest) {
       } satisfies ProductSearchResult);
     }
 
-    const matches = await searchAllItems(items);
+    const { amazonTld } = getLocaleConfig(countryCode ?? "US");
+    const matches = await searchAllItems(items, amazonTld);
     return NextResponse.json({
       matches,
       status: matches.length > 0 ? "complete" : "partial",
@@ -38,20 +51,20 @@ export async function POST(req: NextRequest) {
 }
 
 /** Search for all items in parallel on Amazon via ScraperAPI */
-async function searchAllItems(items: StylingItem[]): Promise<ProductMatch[]> {
+async function searchAllItems(items: StylingItem[], amazonTld: string): Promise<ProductMatch[]> {
   const results = await Promise.all(
-    items.map((item) => searchAmazon(item)),
+    items.map((item) => searchAmazon(item, amazonTld)),
   );
   return results.filter((m): m is ProductMatch => m !== null);
 }
 
 /** Search Amazon via ScraperAPI structured endpoint */
-async function searchAmazon(item: StylingItem): Promise<ProductMatch | null> {
+async function searchAmazon(item: StylingItem, amazonTld: string): Promise<ProductMatch | null> {
   try {
     const params = new URLSearchParams({
       api_key: process.env.SCRAPERAPI_KEY!,
       query: item.search_query || item.name,
-      tld: "com",
+      tld: amazonTld,
     });
 
     const res = await fetch(`${SCRAPERAPI_BASE}?${params.toString()}`, {
@@ -79,7 +92,7 @@ async function searchAmazon(item: StylingItem): Promise<ProductMatch | null> {
       item_name: item.name,
       product_title: String(match.name || ""),
       product_url: asin
-        ? `https://www.amazon.com/dp/${asin}`
+        ? `https://www.amazon.${amazonTld}/dp/${asin}`
         : String(match.url || ""),
       real_price: typeof match.price === "number" ? match.price : null,
       store: "Amazon",

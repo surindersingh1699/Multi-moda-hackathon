@@ -11,6 +11,7 @@ import FavoritesPanel from "@/components/FavoritesPanel";
 import CompareView from "@/components/CompareView";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
+import { useLocale } from "@/lib/locale";
 import {
   saveAnalysis,
   updateAnalysisStyledImage,
@@ -31,7 +32,6 @@ const PENDING_IMAGE_KEY = "roomify_pending_image";
 
 type AppState = "idle" | "loading" | "error" | "results";
 
-const BUDGET_OPTIONS = [100, 150, 200, 500] as const;
 
 const LOADING_STEPS = [
   { text: "Hmm, let me take a good look at your room...", Icon: DoodleCamera },
@@ -53,6 +53,7 @@ const VIBE_OPTIONS = [
 
 export default function Home() {
   const { user, loading: authLoading, usageCount, isAdmin, refreshUsage } = useAuth();
+  const localeConfig = useLocale();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const usageLimitReached = !isAdmin && usageCount !== null && usageCount >= MAX_USES;
 
@@ -101,6 +102,16 @@ export default function Home() {
     const supabase = createClient();
     fetchFavorites(supabase, userId).then(setFavorites);
   }, [userId]);
+
+  // Sync budget default when locale is detected (only on initial mount)
+  const localeInitRef = useRef(false);
+  useEffect(() => {
+    if (localeInitRef.current) return;
+    if (localeConfig.countryCode !== "US" || localeConfig.defaultBudget !== 150) {
+      setBudget(localeConfig.defaultBudget);
+      localeInitRef.current = true;
+    }
+  }, [localeConfig.countryCode, localeConfig.defaultBudget]);
 
   const handleToggleFavorite = useCallback(
     async (item: StylingItem, match?: ProductMatch) => {
@@ -190,7 +201,7 @@ export default function Home() {
 
       if (res.ok) {
         const { shareUrl, title } = await res.json();
-        const shareText = `Check out my AI room makeover! ${result.items?.length ?? 0} items for $${result.total_estimated_cost ?? 0}.`;
+        const shareText = `Check out my AI room makeover! ${result.items?.length ?? 0} items for ${localeConfig.currencySymbol}${result.total_estimated_cost ?? 0}.`;
 
         if (navigator.share) {
           await navigator.share({ title, text: shareText, url: shareUrl });
@@ -298,6 +309,7 @@ export default function Home() {
           userPrompt: prompt || undefined,
           budget,
           roomContext: roomContext.trim() || undefined,
+          countryCode: localeConfig.countryCode,
         }),
       });
 
@@ -329,7 +341,14 @@ export default function Home() {
             if (line.startsWith("event: ")) {
               eventType = line.slice(7).trim();
             } else if (line.startsWith("data: ") && eventType) {
-              const data = JSON.parse(line.slice(6));
+              let data: Record<string, unknown>;
+              try {
+                data = JSON.parse(line.slice(6));
+              } catch {
+                console.warn("SSE: failed to parse data line, skipping");
+                eventType = "";
+                continue;
+              }
 
               if (eventType === "complete") {
                 const parsed = parseResultSafe(data);
@@ -338,7 +357,7 @@ export default function Home() {
                 setApiDone(true);
                 refreshUsage();
               } else if (eventType === "error") {
-                throw new Error(data.error || "Analysis failed");
+                throw new Error((data.error as string) || "Analysis failed");
               }
               // "analysis" and "recommendations" events are intermediate —
               // the loading animation still plays through, and results reveal
@@ -376,7 +395,7 @@ export default function Home() {
       const res = await fetch("/api/find-products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: analysisResult.items }),
+        body: JSON.stringify({ items: analysisResult.items, countryCode: localeConfig.countryCode }),
       });
       if (res.ok) {
         const data: ProductSearchResult = await res.json();
@@ -498,6 +517,8 @@ export default function Home() {
         osc.start(ctx.currentTime + i * 0.12);
         osc.stop(ctx.currentTime + i * 0.12 + 0.5);
       });
+      // Close AudioContext after playback to prevent leak
+      setTimeout(() => ctx.close().catch(() => {}), 1000);
     } catch {
       // Audio not supported — silently skip
     }
@@ -786,7 +807,7 @@ export default function Home() {
                     What&apos;s your budget?
                   </label>
                   <div className="flex gap-2">
-                    {BUDGET_OPTIONS.map((opt) => (
+                    {localeConfig.budgetPresets.map((opt) => (
                       <button
                         key={opt}
                         onClick={() => { setBudget(opt); setCustomBudget(""); }}
@@ -797,21 +818,30 @@ export default function Home() {
                         }`}
                         style={budget === opt && !customBudget ? { background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' } : undefined}
                       >
-                        ${opt}
+                        {localeConfig.currencySymbol}{opt}
                       </button>
                     ))}
                     <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-txt-muted pointer-events-none">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-txt-muted pointer-events-none">{localeConfig.currencySymbol}</span>
                       <input
                         type="number"
-                        min={25}
-                        max={500}
+                        min={Math.round(localeConfig.budgetPresets[0] * 0.25)}
+                        max={localeConfig.budgetPresets[localeConfig.budgetPresets.length - 1] * 2}
                         placeholder="Custom"
                         value={customBudget}
                         onChange={(e) => {
                           setCustomBudget(e.target.value);
                           const val = parseInt(e.target.value, 10);
-                          if (val > 0) setBudget(val);
+                          const maxBudget = localeConfig.budgetPresets[localeConfig.budgetPresets.length - 1] * 2;
+                          if (val > 0) setBudget(Math.min(maxBudget, val));
+                        }}
+                        onBlur={() => {
+                          if (!customBudget) return;
+                          const minBudget = Math.round(localeConfig.budgetPresets[0] * 0.25);
+                          const maxBudget = localeConfig.budgetPresets[localeConfig.budgetPresets.length - 1] * 2;
+                          const clamped = Math.max(minBudget, Math.min(maxBudget, parseInt(customBudget, 10) || localeConfig.defaultBudget));
+                          setCustomBudget(String(clamped));
+                          setBudget(clamped);
                         }}
                         className={`w-full rounded-xl pl-7 pr-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
                           customBudget
@@ -910,7 +940,7 @@ export default function Home() {
                 <DoodleStar className="w-5 h-5 animate-twinkle" />
               </h2>
               <p className="text-sm text-txt-secondary max-w-sm mx-auto">
-                We found {result.items?.length ?? 0} items to transform your room — all for under ${result.total_estimated_cost ?? 0}.
+                We found {result.items?.length ?? 0} items to transform your room — all for under {localeConfig.currencySymbol}{result.total_estimated_cost ?? 0}.
               </p>
             </div>
 
@@ -1073,6 +1103,8 @@ export default function Home() {
               onToggleFavorite={handleToggleFavorite}
               onShare={handleShare}
               isSharing={isSharing}
+              currencySymbol={localeConfig.currencySymbol}
+              fallbackStores={localeConfig.fallbackStores}
             />
 
             <button

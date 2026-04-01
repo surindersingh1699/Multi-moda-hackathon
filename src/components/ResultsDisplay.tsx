@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { StylingResult, StylingItem, ProductMatch } from "@/lib/schema";
+import type { FallbackStore } from "@/lib/locale";
 import { DoodlePillow, DoodleLamp, DoodlePlant, DoodleStar } from "@/components/DoodleElements";
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   onToggleFavorite?: (item: StylingItem, match?: ProductMatch) => void;
   onShare?: () => void;
   isSharing?: boolean;
+  currencySymbol?: string;
+  fallbackStores?: FallbackStore[];
 }
 
 function findMatch(item: StylingItem, matches: ProductMatch[]): ProductMatch | undefined {
@@ -19,6 +22,11 @@ function findMatch(item: StylingItem, matches: ProductMatch[]): ProductMatch | u
     (m) => m.item_name.toLowerCase() === item.name.toLowerCase(),
   );
 }
+
+const DEFAULT_FALLBACK_STORES: FallbackStore[] = [
+  { name: "Amazon", searchUrl: (q) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}` },
+  { name: "Walmart", searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}` },
+];
 
 export default function ResultsDisplay({
   result,
@@ -29,6 +37,8 @@ export default function ResultsDisplay({
   onToggleFavorite,
   onShare,
   isSharing = false,
+  currencySymbol = "$",
+  fallbackStores = DEFAULT_FALLBACK_STORES,
 }: Props) {
   const [copiedList, setCopiedList] = useState(false);
   const [shared, setShared] = useState(false);
@@ -50,10 +60,10 @@ export default function ResultsDisplay({
     const lines = items.map((item) => {
       const match = findMatch(item, productMatches);
       const price = match?.real_price ?? item.estimated_price;
-      const url = match?.product_url ?? `https://www.amazon.com/s?k=${encodeURIComponent(item.search_query || item.name)}`;
-      return `${item.name} — $${price} — ${url}`;
+      const url = match?.product_url ?? fallbackStores[0]?.searchUrl(item.search_query || item.name) ?? "";
+      return `${item.name} — ${currencySymbol}${price} — ${url}`;
     });
-    const text = `My Room Makeover List ($${totalCost})\n${lines.join("\n")}`;
+    const text = `My Room Makeover List (${currencySymbol}${totalCost})\n${lines.join("\n")}`;
     navigator.clipboard.writeText(text).then(() => {
       setCopiedList(true);
       setTimeout(() => setCopiedList(false), 2000);
@@ -66,7 +76,7 @@ export default function ResultsDisplay({
       onShare();
       return;
     }
-    const text = `Check out my AI room makeover plan from Roomify! ${items.length} items for $${totalCost}.`;
+    const text = `Check out my AI room makeover plan from Roomify! ${items.length} items for ${currencySymbol}${totalCost}.`;
     if (navigator.share) {
       try {
         await navigator.share({ title: "My Room Makeover — Roomify", text });
@@ -199,6 +209,8 @@ export default function ResultsDisplay({
                 isSearching={isSearchingProducts}
                 isFavorited={favoriteNames.has(item.name.toLowerCase())}
                 onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(item, match) : undefined}
+                currencySymbol={currencySymbol}
+                fallbackStores={fallbackStores}
               />
             );
           })}
@@ -246,9 +258,9 @@ export default function ResultsDisplay({
         <p className="text-[10px] text-txt-muted mb-4 text-center">All prices verified against real listings</p>
         <div className="flex items-end gap-2 mb-3">
           <span className="text-3xl font-bold text-txt-primary">
-            ${totalCost}
+            {currencySymbol}{totalCost}
           </span>
-          <span className="text-sm text-txt-muted pb-1">/ ${budget} budget</span>
+          <span className="text-sm text-txt-muted pb-1">/ {currencySymbol}{budget} budget</span>
         </div>
         <div className="h-3 w-full rounded-full bg-bg-secondary overflow-hidden">
           <div
@@ -277,6 +289,8 @@ function ItemCard({
   isSearching,
   isFavorited,
   onToggleFavorite,
+  currencySymbol = "$",
+  fallbackStores = DEFAULT_FALLBACK_STORES,
 }: {
   item: StylingItem;
   index: number;
@@ -284,6 +298,8 @@ function ItemCard({
   isSearching?: boolean;
   isFavorited?: boolean;
   onToggleFavorite?: () => void;
+  currencySymbol?: string;
+  fallbackStores?: FallbackStore[];
 }) {
   const [animating, setAnimating] = useState(false);
   const name = item.name || "Unnamed item";
@@ -348,10 +364,10 @@ function ItemCard({
               </button>
             )}
             {match && match.real_price != null && match.real_price !== price && (
-              <span className="text-[10px] text-txt-muted line-through">${price}</span>
+              <span className="text-[10px] text-txt-muted line-through">{currencySymbol}{price}</span>
             )}
             <span className="text-sm font-bold text-accent-600 bg-accent-50 px-2 py-0.5 rounded-lg">
-              ${match?.real_price ?? price}
+              {currencySymbol}{match?.real_price ?? price}
             </span>
           </div>
         </div>
@@ -398,28 +414,24 @@ function ItemCard({
           ) : (
             /* No match — keep search links (or show shimmer if still searching) */
             <>
-              <a
-                href={`https://www.amazon.com/s?k=${encodeURIComponent(searchQuery)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full bg-accent-50 border border-accent-200 px-2.5 py-0.5 text-[10px] font-semibold text-accent-600 hover:bg-accent-100 transition-colors"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-                </svg>
-                Amazon
-              </a>
-              <a
-                href={`https://www.walmart.com/search?q=${encodeURIComponent(searchQuery)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-                </svg>
-                Walmart
-              </a>
+              {fallbackStores.map((store, i) => (
+                <a
+                  key={store.name}
+                  href={store.searchUrl(searchQuery)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                    i === 0
+                      ? "bg-accent-50 border border-accent-200 text-accent-600 hover:bg-accent-100"
+                      : "bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100"
+                  }`}
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                  </svg>
+                  {store.name}
+                </a>
+              ))}
               {isSearching && (
                 <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] text-txt-muted">
                   <svg className="w-3 h-3 animate-spin mr-1" fill="none" viewBox="0 0 24 24">

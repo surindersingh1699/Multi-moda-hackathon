@@ -13,6 +13,7 @@ import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
 import { optimizeForVision } from "@/lib/image";
+import { getLocaleConfig } from "@/lib/locale";
 
 const MAX_USES = 5;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { image, userPrompt, budget, roomContext } = await req.json();
+    const { image, userPrompt, budget, roomContext, countryCode } = await req.json();
 
     if (!image || typeof image !== "string") {
       return jsonResponse({ error: "Missing or invalid image data" }, 400);
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
 
     const budgetNum =
       typeof budget === "number" && budget > 0 ? budget : 150;
+    const locale = getLocaleConfig(countryCode ?? "US");
 
     // Mock mode when no API key is set
     if (!process.env.OPENAI_API_KEY && !process.env.GOOGLE_API_KEY) {
@@ -88,7 +90,7 @@ export async function POST(req: NextRequest) {
     const optimizedImage = await optimizeForVision(image);
 
     // Build creative prompt (Step A)
-    const creativePrompt = buildCreativePrompt(userPrompt, budgetNum, roomContext);
+    const creativePrompt = buildCreativePrompt(userPrompt, budgetNum, roomContext, locale.currencySymbol);
 
     // SSE stream response
     const encoder = new TextEncoder();
@@ -110,13 +112,17 @@ export async function POST(req: NextRequest) {
               new OpenAI(),
               optimizedImage,
               creativePrompt,
-              budgetNum
+              budgetNum,
+              locale.currencySymbol,
+              locale.storeList
             );
           } else {
             finalResult = await twoStepGemini(
               optimizedImage,
               creativePrompt,
-              budgetNum
+              budgetNum,
+              locale.currencySymbol,
+              locale.storeList
             );
           }
 
@@ -126,12 +132,14 @@ export async function POST(req: NextRequest) {
           if (!validated.ok) {
             // Retry Step B only (creative ideation was fine)
             console.warn("Validation failed, retrying Step B:", validated.error);
-            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with the correct number of items, total under $${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
+            const retryHint = `Previous response failed validation: ${validated.error}. Fix and return valid JSON with the correct number of items, total under ${locale.currencySymbol}${budgetNum}. Ensure total_estimated_cost equals the sum of all item prices.`;
 
             if (process.env.OPENAI_API_KEY) {
               const shoppingPrompt = buildShoppingPrompt(
                 finalResult as unknown as CreativeResult,
-                budgetNum
+                budgetNum,
+                locale.currencySymbol,
+                locale.storeList
               );
               const retryResult = await callOpenAIShopping(
                 new OpenAI(),
@@ -141,7 +149,9 @@ export async function POST(req: NextRequest) {
             } else if (process.env.GOOGLE_API_KEY) {
               const shoppingPrompt = buildShoppingPrompt(
                 finalResult as unknown as CreativeResult,
-                budgetNum
+                budgetNum,
+                locale.currencySymbol,
+                locale.storeList
               );
               const retryResult = await callGeminiText(
                 shoppingPrompt + "\n\n" + retryHint
@@ -204,7 +214,9 @@ async function twoStepOpenAI(
   openai: OpenAI,
   imageDataUrl: string,
   creativePrompt: string,
-  budget: number
+  budget: number,
+  currencySymbol = "$",
+  storeList = "Amazon, Walmart, Target, IKEA, HomeGoods"
 ): Promise<StylingResult> {
   // Step A: Creative ideation (high temperature, with image)
   const creative = await callOpenAICreative(
@@ -214,7 +226,7 @@ async function twoStepOpenAI(
   );
 
   // Step B: Shopping conversion (low temperature, text only)
-  const shoppingPrompt = buildShoppingPrompt(creative, budget);
+  const shoppingPrompt = buildShoppingPrompt(creative, budget, currencySymbol, storeList);
   const result = await callOpenAIShopping(openai, shoppingPrompt);
 
   return result as StylingResult;
@@ -272,13 +284,15 @@ async function callOpenAIShopping(
 async function twoStepGemini(
   imageDataUrl: string,
   creativePrompt: string,
-  budget: number
+  budget: number,
+  currencySymbol = "$",
+  storeList = "Amazon, Walmart, Target, IKEA, HomeGoods"
 ): Promise<StylingResult> {
   // Step A: Creative ideation (with image)
   const creative = await callGeminiCreative(imageDataUrl, creativePrompt);
 
   // Step B: Shopping conversion (text only)
-  const shoppingPrompt = buildShoppingPrompt(creative, budget);
+  const shoppingPrompt = buildShoppingPrompt(creative, budget, currencySymbol, storeList);
   const result = await callGeminiText(shoppingPrompt);
 
   return result as StylingResult;

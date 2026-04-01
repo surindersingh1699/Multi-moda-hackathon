@@ -9,7 +9,8 @@ import type { CreativeResult } from "./schema";
 export function buildCreativePrompt(
   userPrompt?: string,
   budget?: number,
-  roomContext?: string
+  roomContext?: string,
+  currencySymbol = "$"
 ): string {
   const budgetNum = budget ?? 150;
 
@@ -30,7 +31,7 @@ Design rules:
 - Prefer visible, dramatic upgrades over safe, subtle ones.
 - Every idea should create a noticeable before-vs-after difference.
 - Include 1–2 free quick wins (rearranging, decluttering, lighting tricks).
-- This is roughly a $${budgetNum} makeover — keep ideas realistic for that range, but don't do budget math. Just think about what would look amazing.
+- This is roughly a ${currencySymbol}${budgetNum} makeover — keep ideas realistic for that range, but don't do budget math. Just think about what would look amazing.
 
 Return ONLY valid JSON:
 
@@ -83,7 +84,9 @@ Use this to prioritize upgrades that solve real problems and match how the perso
  */
 export function buildShoppingPrompt(
   creative: CreativeResult,
-  budget?: number
+  budget?: number,
+  currencySymbol = "$",
+  storeList = "Amazon, Walmart, Target, IKEA, HomeGoods"
 ): string {
   const budgetNum = budget ?? 150;
 
@@ -101,8 +104,8 @@ ${creative.ideas.map((idea, i) => `${i + 1}. ${idea.name} (${idea.category}) —
 Your job: convert each idea into a real, purchasable item with accurate pricing and shopping details.
 
 Budget rules:
-- Total budget: $${budgetNum}. Use at least 90% of it.
-- Total must stay at or under $${budgetNum}.
+- Total budget: ${currencySymbol}${budgetNum}. Use at least 90% of it.
+- Total must stay at or under ${currencySymbol}${budgetNum}.
 - Keep prices honest — no fake prices. Use realistic retail prices.
 - Distribute the budget smartly across items.
 
@@ -136,7 +139,7 @@ Field rules:
 - reason: keep from creative plan
 - estimated_price: realistic retail price for this item
 - priority: 1 = highest impact, ascending
-- suggested_store: where to buy (Amazon, Walmart, Target, IKEA, HomeGoods, etc.)
+- suggested_store: where to buy (${storeList}, etc.)
 - search_query: detailed query with color, material, size — specific enough to find this exact item online
 - placement: precise location in the room (e.g. "on the nightstand to the left of the bed")
 - total_estimated_cost: must equal the sum of all estimated_price values
@@ -145,5 +148,5 @@ Rules:
 - JSON only, no markdown, no extra keys
 - Exactly ${creative.ideas.length} items (one per creative idea)
 - Ensure total_estimated_cost equals the sum of all item prices
-- Stay at or under $${budgetNum}`;
+- Stay at or under ${currencySymbol}${budgetNum}`;
 }
