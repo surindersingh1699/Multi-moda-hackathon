@@ -82,6 +82,7 @@ export default function Home() {
   const [apiDone, setApiDone] = useState(false);
   const pendingResultRef = useRef<{ data: StylingResult; base64: string } | null>(null);
   const targetStepRef = useRef(0);
+  const lastImageBase64Ref = useRef<string | null>(null);
 
   // History, Favorites, Compare panel state
   const [showHistory, setShowHistory] = useState(false);
@@ -424,6 +425,7 @@ export default function Home() {
 
   const generateStyledRoom = async (imageBase64: string, analysisResult: StylingResult, products: ProductMatch[]) => {
     setIsGeneratingImage(true);
+    lastImageBase64Ref.current = imageBase64;
     try {
       // Build items with real product names when available
       const itemsWithProducts = analysisResult.items.map((i) => {
@@ -455,6 +457,52 @@ export default function Home() {
             updateAnalysisStyledImage(supabase, currentAnalysisId.current, data.styledImageUrl);
           }
         }
+      }
+    } catch {
+      setImageGenFailed(true);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const regenerateWithGemini = async () => {
+    if (!result || !lastImageBase64Ref.current) return;
+    setIsGeneratingImage(true);
+    setImageGenFailed(false);
+    try {
+      const itemsWithProducts = result.items.map((i) => {
+        const match = productMatches.find((p) => p.item_name === i.name);
+        return {
+          name: i.name,
+          category: i.category,
+          placement: i.placement,
+          product_title: match?.product_title || undefined,
+        };
+      });
+
+      const res = await fetch("/api/generate-styled-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: lastImageBase64Ref.current,
+          styleDirection: result.style_direction,
+          items: itemsWithProducts,
+          provider: "gemini",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.styledImageUrl) {
+          setStyledImageUrl(data.styledImageUrl);
+          if (currentAnalysisId.current) {
+            const supabase = createClient();
+            updateAnalysisStyledImage(supabase, currentAnalysisId.current, data.styledImageUrl);
+          }
+        }
+      } else {
+        const body = await res.json().catch(() => ({}));
+        console.warn("Gemini retry failed:", body.error);
+        setImageGenFailed(true);
       }
     } catch {
       setImageGenFailed(true);
@@ -1021,8 +1069,8 @@ export default function Home() {
                   beforeSrc={previewUrl}
                   afterSrc={styledImageUrl}
                 />
-                {/* Download before/after */}
-                <div className="flex justify-center">
+                {/* Download + Retry actions */}
+                <div className="flex justify-center gap-2">
                   <button
                     onClick={() => {
                       const link = document.createElement("a");
@@ -1036,6 +1084,23 @@ export default function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Download Image
+                  </button>
+                  <button
+                    onClick={regenerateWithGemini}
+                    disabled={isGeneratingImage}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-txt-muted hover:text-accent-500 transition-colors px-3 py-1.5 rounded-full border border-accent-100 hover:border-accent-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGeneratingImage ? (
+                      <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    )}
+                    {isGeneratingImage ? "Regenerating..." : "Not right? Retry with Gemini"}
                   </button>
                 </div>
               </div>

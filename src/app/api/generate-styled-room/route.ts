@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { optimizeForEdit, parseDataUrl } from "@/lib/image";
-import { generateStyledRoom } from "@/lib/image-gen";
+import { generateStyledRoom, generateStyledRoomWithProvider } from "@/lib/image-gen";
 import { createClient } from "@/lib/supabase/server";
 
 interface ItemInput {
@@ -34,10 +34,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { imageBase64, items, styleDirection } = (await req.json()) as {
+    const { imageBase64, items, styleDirection, provider } = (await req.json()) as {
       imageBase64: string;
       items: ItemInput[];
       styleDirection?: string;
+      provider?: "gemini";
     };
 
     if (!imageBase64 || !items?.length) {
@@ -79,11 +80,9 @@ Make the result photorealistic and attractive — the same room, just with a few
 
     const size = pickSize(optimizedBuffer);
 
-    const result = await generateStyledRoom(
-      optimizedBuffer,
-      editPrompt,
-      size
-    );
+    const result = provider === "gemini"
+      ? await generateStyledRoomWithProvider(optimizedBuffer, editPrompt, size, "gemini")
+      : await generateStyledRoom(optimizedBuffer, editPrompt, size);
 
     console.log(`Styled room generated via ${result.provider}`);
 
