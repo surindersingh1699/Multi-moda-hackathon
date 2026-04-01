@@ -380,6 +380,7 @@ export default function Home() {
         if (!parsed.ok) {
           throw new Error(`Invalid response: ${parsed.error}`);
         }
+        targetStepRef.current = LOADING_STEPS.length - 1;
         pendingResultRef.current = { data: parsed.data, base64 };
         setApiDone(true);
         refreshUsage();
@@ -526,17 +527,18 @@ export default function Home() {
     }
   }, [styledImageUrl, appState]);
 
-  // Rotate loading step messages — speeds up once API returns
+  // Advance loading steps toward server-reported target (600ms per step)
   useEffect(() => {
     if (appState !== "loading") return;
-    const speed = apiDone ? 600 : 2000;
     const interval = setInterval(() => {
-      setLoadingStep((prev) =>
-        prev < LOADING_STEPS.length - 1 ? prev + 1 : prev
-      );
-    }, speed);
+      setLoadingStep((prev) => {
+        if (prev >= LOADING_STEPS.length - 1) return prev;
+        if (prev < targetStepRef.current) return prev + 1;
+        return prev; // hold — server hasn't progressed yet
+      });
+    }, 600);
     return () => clearInterval(interval);
-  }, [appState, apiDone]);
+  }, [appState]);
 
   // Reveal results once loading steps finish and API is done
   useEffect(() => {
@@ -569,7 +571,7 @@ export default function Home() {
       setIsSearchingProducts(true);
       findProducts(pending.data).then(() => setIsSearchingProducts(false));
       generateStyledRoom(pending.base64, pending.data, []);
-    }, 800);
+    }, 300);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appState, apiDone, loadingStep]);

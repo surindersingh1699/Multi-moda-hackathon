@@ -32,6 +32,7 @@ Design rules:
 - Every idea should create a noticeable before-vs-after difference.
 - Include 1–2 free quick wins (rearranging, decluttering, lighting tricks).
 - This is roughly a ${currencySymbol}${budgetNum} makeover — keep ideas realistic for that range, but don't do budget math. Just think about what would look amazing.
+- IMPORTANT: If you see framed photos, prints, or artwork on walls, recommend "wall art", "framed art print", or "canvas print" — NOT "photo frames." Photo frames are empty frames; what you see on walls is framed art or wall decor.
 
 Return ONLY valid JSON:
 
@@ -140,7 +141,7 @@ Field rules:
 - estimated_price: realistic retail price for this item
 - priority: 1 = highest impact, ascending
 - suggested_store: where to buy (${storeList}, etc.)
-- search_query: detailed query with color, material, size — specific enough to find this exact item online
+- search_query: detailed query with color, material, size — specific enough to find this exact item online. For wall art, search "framed wall art" or "canvas print" — NEVER "photo frame" (that returns empty frames, not artwork)
 - placement: precise location in the room (e.g. "on the nightstand to the left of the bed")
 - total_estimated_cost: must equal the sum of all estimated_price values
 
