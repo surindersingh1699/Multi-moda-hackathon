@@ -63,6 +63,7 @@ export default function Home() {
   const [result, setResult] = useState<StylingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userPrompt, setUserPrompt] = useState("");
+  const [roomContext, setRoomContext] = useState("");
   const [budget, setBudget] = useState<number>(150);
   const [customBudget, setCustomBudget] = useState<string>("");
   const [activeVibe, setActiveVibe] = useState<string | null>(null);
@@ -76,6 +77,7 @@ export default function Home() {
   // AI Shopping Agent state
   const [productMatches, setProductMatches] = useState<ProductMatch[]>([]);
   const [productSearchFailed, setProductSearchFailed] = useState(false);
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
   const [apiDone, setApiDone] = useState(false);
   const pendingResultRef = useRef<{ data: StylingResult; base64: string } | null>(null);
 
@@ -162,6 +164,7 @@ export default function Home() {
       setIsGeneratingImage(false);
       setImageGenFailed(false);
       setProductSearchFailed(false);
+      setIsSearchingProducts(false);
     },
     [],
   );
@@ -211,6 +214,7 @@ export default function Home() {
     setImageGenFailed(false);
     setProductMatches([]);
     setProductSearchFailed(false);
+    setIsSearchingProducts(false);
     setActiveVibe(null);
     setApiDone(false);
     pendingResultRef.current = null;
@@ -279,6 +283,7 @@ export default function Home() {
     setError(null);
     setStyledImageUrl(null);
     setImageGenFailed(false);
+    setIsSearchingProducts(false);
 
     const prompt = promptOverride ?? userPrompt.trim();
 
@@ -291,6 +296,7 @@ export default function Home() {
           image: base64,
           userPrompt: prompt || undefined,
           budget,
+          roomContext: roomContext.trim() || undefined,
         }),
       });
 
@@ -362,7 +368,7 @@ export default function Home() {
     }
   };
 
-  const findProducts = async (analysisResult: StylingResult) => {
+  const findProducts = async (analysisResult: StylingResult): Promise<ProductMatch[]> => {
     setProductMatches([]);
     setProductSearchFailed(false);
     try {
@@ -380,6 +386,7 @@ export default function Home() {
             const supabase = createClient();
             updateAnalysisProducts(supabase, currentAnalysisId.current, data.matches);
           }
+          return data.matches;
         } else {
           setProductSearchFailed(true);
         }
@@ -389,22 +396,30 @@ export default function Home() {
     } catch {
       setProductSearchFailed(true);
     }
+    return [];
   };
 
-  const generateStyledRoom = async (imageBase64: string, analysisResult: StylingResult) => {
+  const generateStyledRoom = async (imageBase64: string, analysisResult: StylingResult, products: ProductMatch[]) => {
     setIsGeneratingImage(true);
     try {
+      // Build items with real product names when available
+      const itemsWithProducts = analysisResult.items.map((i) => {
+        const match = products.find((p) => p.item_name === i.name);
+        return {
+          name: i.name,
+          category: i.category,
+          placement: i.placement,
+          product_title: match?.product_title || undefined,
+        };
+      });
+
       const res = await fetch("/api/generate-styled-room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64,
           styleDirection: analysisResult.style_direction,
-          items: analysisResult.items.map((i) => ({
-            name: i.name,
-            category: i.category,
-            placement: i.placement,
-          })),
+          items: itemsWithProducts,
         }),
       });
       if (res.ok) {
@@ -526,8 +541,11 @@ export default function Home() {
         currentAnalysisId.current = id;
       }
 
-      generateStyledRoom(pending.base64, pending.data);
-      findProducts(pending.data);
+      // Sequential: find products first, then use them for image generation
+      setIsSearchingProducts(true);
+      const products = await findProducts(pending.data);
+      setIsSearchingProducts(false);
+      generateStyledRoom(pending.base64, pending.data, products);
     }, 800);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -548,7 +566,9 @@ export default function Home() {
     setImageGenFailed(false);
     setProductMatches([]);
     setProductSearchFailed(false);
+    setIsSearchingProducts(false);
     setUserPrompt("");
+    setRoomContext("");
     setActiveVibe(null);
     setApiDone(false);
     pendingResultRef.current = null;
@@ -576,39 +596,34 @@ export default function Home() {
                 {/* Favorites button */}
                 <button
                   onClick={() => setShowFavorites(true)}
-                  className="relative flex h-7 w-7 items-center justify-center rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors"
-                  title="My Favorites"
+                  className="relative flex items-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors px-2.5 py-1"
                 >
                   <svg className="w-3.5 h-3.5 text-rose-400" fill={favorites.length > 0 ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {favorites.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-400 text-white text-[8px] font-bold flex items-center justify-center">
-                      {favorites.length}
-                    </span>
-                  )}
+                  <span className="text-[10px] font-semibold text-txt-muted">Saved{favorites.length > 0 ? ` (${favorites.length})` : ""}</span>
                 </button>
 
                 {/* History button */}
                 <button
                   onClick={() => setShowHistory(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors"
-                  title="My Makeovers"
+                  className="flex items-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors px-2.5 py-1"
                 >
                   <svg className="w-3.5 h-3.5 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
+                  <span className="text-[10px] font-semibold text-txt-muted">History</span>
                 </button>
 
                 {/* Compare button */}
                 <button
                   onClick={() => setShowCompare(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors"
-                  title="Compare Rooms"
+                  className="flex items-center gap-1 rounded-full border border-accent-200 bg-bg-card/50 hover:bg-accent-50 transition-colors px-2.5 py-1"
                 >
                   <svg className="w-3.5 h-3.5 text-txt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
                   </svg>
+                  <span className="text-[10px] font-semibold text-txt-muted">Compare</span>
                 </button>
               </>
             )}
@@ -745,6 +760,22 @@ export default function Home() {
                     onChange={(e) => setUserPrompt(e.target.value)}
                     placeholder='e.g., "warm and cozy" or "modern minimalist"'
                     className="w-full rounded-xl border border-accent-200 bg-bg-card px-4 py-3 text-sm text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                {/* Room context */}
+                <div>
+                  <label htmlFor="room-context" className="block text-xs font-semibold text-txt-muted uppercase tracking-wider mb-1.5">
+                    Tell us about this room (optional)
+                  </label>
+                  <textarea
+                    id="room-context"
+                    value={roomContext}
+                    onChange={(e) => setRoomContext(e.target.value)}
+                    placeholder="e.g., I work from home here and need better lighting for video calls"
+                    rows={2}
+                    maxLength={300}
+                    className="w-full rounded-xl border border-accent-200 bg-bg-card px-4 py-3 text-sm text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all resize-none"
                   />
                 </div>
 
@@ -910,6 +941,31 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              <form
+                className="flex gap-2 mt-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const input = (e.currentTarget.elements.namedItem("custom-vibe") as HTMLInputElement)?.value.trim();
+                  if (!input) return;
+                  setActiveVibe(input);
+                  setUserPrompt(input);
+                  analyze(input);
+                }}
+              >
+                <input
+                  name="custom-vibe"
+                  type="text"
+                  placeholder="Or describe your own vibe..."
+                  className="flex-1 rounded-full border border-accent-200 bg-bg-secondary px-4 py-2 text-xs text-txt-primary placeholder:text-txt-muted/50 focus:outline-none focus:ring-2 focus:ring-accent-300 focus:border-transparent transition-all"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full px-4 py-2 text-xs font-semibold text-txt-on-accent transition-all duration-200"
+                  style={{ background: 'linear-gradient(135deg, #E8753A, #D4622D, #B84E20)' }}
+                >
+                  Go
+                </button>
+              </form>
             </div>
 
             {/* Before/After Slider — Phase 2 */}
@@ -939,19 +995,59 @@ export default function Home() {
               </div>
             )}
 
-            {/* Styled room loading indicator */}
-            {isGeneratingImage && !styledImageUrl && (
-              <div className="rounded-2xl bg-bg-card border border-accent-100 p-5 text-center animate-fadeIn"
+            {/* Sequential progress: products → image generation */}
+            {(isSearchingProducts || isGeneratingImage) && !styledImageUrl && (
+              <div className="rounded-2xl bg-bg-card border border-accent-100 p-5 animate-fadeIn"
                 style={{ boxShadow: '0 1px 3px rgba(44,24,16,0.06)' }}
               >
-                <p className="text-xs font-medium text-txt-secondary">
-                  Generating your before &amp; after preview...
+                {/* Step indicators */}
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  {/* Step 1: Find Products */}
+                  <div className={`flex items-center gap-1.5 text-xs font-medium transition-colors duration-300 ${
+                    isSearchingProducts ? "text-accent-500" : productMatches.length > 0 ? "text-green-600" : "text-txt-muted"
+                  }`}>
+                    {isSearchingProducts ? (
+                      <div className="w-3.5 h-3.5 border-2 border-accent-300 border-t-accent-500 rounded-full animate-spin" />
+                    ) : productMatches.length > 0 ? (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-txt-muted/30" />
+                    )}
+                    Find Products
+                  </div>
+
+                  <svg className="w-3 h-3 text-txt-muted/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+
+                  {/* Step 2: Generate Image */}
+                  <div className={`flex items-center gap-1.5 text-xs font-medium transition-colors duration-300 ${
+                    isGeneratingImage ? "text-accent-500" : "text-txt-muted/50"
+                  }`}>
+                    {isGeneratingImage ? (
+                      <div className="w-3.5 h-3.5 border-2 border-accent-300 border-t-accent-500 rounded-full animate-spin" />
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-txt-muted/30" />
+                    )}
+                    Generate Preview
+                  </div>
+                </div>
+
+                {/* Current step detail */}
+                <p className="text-xs font-medium text-txt-secondary text-center">
+                  {isSearchingProducts
+                    ? "Finding real products on Amazon..."
+                    : "Creating your before & after preview with real products..."}
                 </p>
                 <div className="w-40 h-1.5 rounded-full overflow-hidden mt-2.5 mx-auto">
                   <div className="h-full w-full animate-shimmer rounded-full" />
                 </div>
-                <p className="text-[10px] text-txt-muted mt-2">
-                  Almost there — this takes about 20 seconds
+                <p className="text-[10px] text-txt-muted mt-2 text-center">
+                  {isSearchingProducts
+                    ? "Matching items to real products — a few seconds"
+                    : "Almost there — this takes about 20 seconds"}
                 </p>
               </div>
             )}
@@ -971,7 +1067,7 @@ export default function Home() {
               result={result}
               budget={budget}
               productMatches={productMatches}
-              isSearchingProducts={productMatches.length === 0 && !productSearchFailed && appState === "results"}
+              isSearchingProducts={isSearchingProducts}
               favoriteNames={favoriteNames}
               onToggleFavorite={handleToggleFavorite}
               onShare={handleShare}

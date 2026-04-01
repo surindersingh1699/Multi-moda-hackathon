@@ -7,6 +7,7 @@ interface ItemInput {
   name: string;
   category: string;
   placement: string;
+  product_title?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -38,10 +39,12 @@ export async function POST(req: NextRequest) {
     const { buffer: optimizedBuffer, originalWidth, originalHeight } = await optimizeForEdit(imageBase64);
 
     const itemList = items
-      .map(
-        (item, i) =>
-          `${i + 1}. ${item.name} (${item.category}) — placed ${item.placement}`
-      )
+      .map((item, i) => {
+        const displayName = item.product_title
+          ? `${item.product_title} (originally: ${item.name})`
+          : item.name;
+        return `${i + 1}. ${displayName} (${item.category}) — placed ${item.placement}`;
+      })
       .join("\n");
 
     // Photo-editor prompt — faithful to the room, smart about real-world conditions

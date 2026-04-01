@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { image, userPrompt, budget } = await req.json();
+    const { image, userPrompt, budget, roomContext } = await req.json();
 
     if (!image || typeof image !== "string") {
       return jsonResponse({ error: "Missing or invalid image data" }, 400);
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     const optimizedImage = await optimizeForVision(image);
 
     // Build creative prompt (Step A)
-    const creativePrompt = buildCreativePrompt(userPrompt, budgetNum);
+    const creativePrompt = buildCreativePrompt(userPrompt, budgetNum, roomContext);
 
     // SSE stream response
     const encoder = new TextEncoder();

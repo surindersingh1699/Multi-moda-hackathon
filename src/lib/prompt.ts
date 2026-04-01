@@ -8,7 +8,8 @@ import type { CreativeResult } from "./schema";
  */
 export function buildCreativePrompt(
   userPrompt?: string,
-  budget?: number
+  budget?: number,
+  roomContext?: string
 ): string {
   const budgetNum = budget ?? 150;
 
@@ -62,6 +63,13 @@ Rules:
 
 The person wants this vibe: "${userPrompt.trim()}"
 Channel that energy hard — but trust your eye over their words if the room calls for something better.`;
+  }
+
+  if (roomContext && roomContext.trim()) {
+    prompt += `
+
+Context about this room and how it's used: "${roomContext.trim()}"
+Use this to prioritize upgrades that solve real problems and match how the person actually lives in this space. Functional wins > purely decorative ones when they conflict.`;
   }
 
   return prompt;
