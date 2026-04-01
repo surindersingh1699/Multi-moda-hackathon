@@ -26,11 +26,12 @@ export default function HistoryPanel({ open, onClose, onLoadAnalysis }: Props) {
   const [loading, setLoading] = useState(true);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
+  const userId = user?.id;
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     setLoading(true);
     const supabase = createClient();
-    const rows = await fetchAnalyses(supabase, user.id);
+    const rows = await fetchAnalyses(supabase, userId);
     setAnalyses(rows);
     setLoading(false);
 
@@ -43,11 +44,11 @@ export default function HistoryPanel({ open, onClose, onLoadAnalysis }: Props) {
       }
     }
     setImageUrls(urls);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    if (open && user) load();
-  }, [open, user, load]);
+    if (open && userId) load();
+  }, [open, userId, load]);
 
   const handleArchive = async (id: string) => {
     const supabase = createClient();

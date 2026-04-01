@@ -95,11 +95,12 @@ export default function Home() {
   );
 
   // Load favorites when user logs in
+  const userId = user?.id;
   useEffect(() => {
-    if (!user) { setFavorites([]); return; }
+    if (!userId) { setFavorites([]); return; }
     const supabase = createClient();
-    fetchFavorites(supabase, user.id).then(setFavorites);
-  }, [user]);
+    fetchFavorites(supabase, userId).then(setFavorites);
+  }, [userId]);
 
   const handleToggleFavorite = useCallback(
     async (item: StylingItem, match?: ProductMatch) => {

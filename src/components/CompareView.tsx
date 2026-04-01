@@ -19,11 +19,12 @@ export default function CompareView({ open, onClose }: Props) {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [comparing, setComparing] = useState(false);
 
+  const userId = user?.id;
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     setLoading(true);
     const supabase = createClient();
-    const rows = await fetchAnalyses(supabase, user.id);
+    const rows = await fetchAnalyses(supabase, userId);
     setAnalyses(rows);
     setLoading(false);
 
@@ -35,15 +36,15 @@ export default function CompareView({ open, onClose }: Props) {
       }
     }
     setImageUrls(urls);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    if (open && user) {
+    if (open && userId) {
       load();
       setSelected(new Set());
       setComparing(false);
     }
-  }, [open, user, load]);
+  }, [open, userId, load]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {

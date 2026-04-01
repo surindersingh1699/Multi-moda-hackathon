@@ -44,17 +44,18 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
 
+  const userId = user?.id;
   const refreshUsage = useCallback(async () => {
-    if (!user || !supabase || isAdmin) {
+    if (!userId || !supabase || isAdmin) {
       setUsageCount(null);
       return;
     }
     const { count } = await supabase
       .from("usage")
       .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
     setUsageCount(count ?? 0);
-  }, [user, supabase, isAdmin]);
+  }, [userId, supabase, isAdmin]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -67,7 +68,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const newUser = session?.user ?? null;
+      // Only update if the user actually changed — prevents cascading
+      // re-renders and re-fetches on token refresh events
+      setUser((prev) => (prev?.id === newUser?.id ? prev : newUser));
     });
 
     return () => subscription.unsubscribe();
