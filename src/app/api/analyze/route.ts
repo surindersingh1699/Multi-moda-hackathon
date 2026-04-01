@@ -10,42 +10,13 @@ import type { StylingResult } from "@/lib/schema";
 import { validateResult } from "@/lib/validate";
 import { MOCK_RESULT } from "@/lib/mock";
 import { createClient } from "@/lib/supabase/server";
-import { optimizeForVision, imageHash } from "@/lib/image";
+import { optimizeForVision } from "@/lib/image";
 
 const MAX_USES = 5;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .filter(Boolean);
 const MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
-
-// ── Content cache ──────────────────────────────────────────────────
-
-interface CacheEntry {
-  result: StylingResult;
-  expiry: number;
-}
-
-const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-const CACHE_MAX_SIZE = 100;
-
-function getCached(hash: string): StylingResult | null {
-  const entry = cache.get(hash);
-  if (!entry) return null;
-  if (Date.now() > entry.expiry) {
-    cache.delete(hash);
-    return null;
-  }
-  return entry.result;
-}
-
-function setCache(hash: string, result: StylingResult): void {
-  if (cache.size >= CACHE_MAX_SIZE) {
-    const oldest = cache.keys().next().value;
-    if (oldest) cache.delete(oldest);
-  }
-  cache.set(hash, { result, expiry: Date.now() + CACHE_TTL_MS });
-}
 
 // ── Main handler ───────────────────────────────────────────────────
 
@@ -109,15 +80,6 @@ export async function POST(req: NextRequest) {
     if (!process.env.OPENAI_API_KEY && !process.env.GOOGLE_API_KEY) {
       await new Promise((r) => setTimeout(r, 1500));
       return jsonResponse(MOCK_RESULT);
-    }
-
-    // Cache check — key includes prompt + budget so different vibes get fresh results
-    const prompt = typeof userPrompt === "string" ? userPrompt.trim() : "";
-    const hash = imageHash(image) + `:${prompt}:${budgetNum}`;
-    const cached = getCached(hash);
-    if (cached) {
-      await supabase.from("usage").insert({ user_id: user.id });
-      return jsonResponse(cached);
     }
 
     // Optimize image once (sharp resize to 1536px, JPEG q85)
@@ -189,8 +151,7 @@ export async function POST(req: NextRequest) {
 
           finalResult = validated.data;
 
-          // Cache + record usage
-          setCache(hash, finalResult);
+          // Record usage
           await supabase.from("usage").insert({ user_id: user.id });
 
           // Send complete event with full result

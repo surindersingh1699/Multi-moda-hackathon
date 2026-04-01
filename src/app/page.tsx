@@ -346,7 +346,7 @@ export default function Home() {
           throw new Error("Stream ended without complete result");
         }
       } else {
-        // Fallback: plain JSON response (cache hits, mock mode)
+        // Fallback: plain JSON response (mock mode)
         const raw = await res.json();
         const parsed = parseResultSafe(raw);
         if (!parsed.ok) {

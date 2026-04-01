@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import { createHash } from "crypto";
 
 const MAX_DIMENSION = 1536;
 
@@ -47,14 +46,6 @@ export async function optimizeForEdit(
   return { buffer: optimized, mimeType: "image/png", originalWidth, originalHeight };
 }
 
-/**
- * Compute SHA-256 hash of first 8KB of the image buffer (fast fingerprint).
- */
-export function imageHash(dataUrl: string): string {
-  const { buffer } = parseDataUrl(dataUrl);
-  const slice = buffer.subarray(0, 8192);
-  return createHash("sha256").update(slice).digest("hex");
-}
 
 /**
  * Strip data URL prefix, return raw buffer + mime type.
